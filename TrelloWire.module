@@ -1,0 +1,52 @@
+<?php
+namespace ProcessWire;
+
+use ProcessWire\TrelloWire\TrelloWireApi;
+
+class TrelloWire extends Wire implements Module
+{
+    public const LOG_NAME = 'trello-wire';
+
+    protected $api;
+
+    public function __construct()
+    {
+        // add namespace to autoload module classes
+        $namespace = 'ProcessWire\\TrelloWire';
+        $classLoader = $this->wire('classLoader');
+        if (!$classLoader->hasNamespace($namespace)) {
+            $srcPath = $this->wire('config')->paths->get($this) . 'src/';
+            $classLoader->addNamespace($namespace, $srcPath);
+        }
+    }
+
+    public static function getModuleInfo()
+    {
+        return [
+            'title' => __('Trello Wire'),
+            'summary' => __('A module providing a bridge to trello to create cards based on pages.'),
+            'author' => "Moritz L'Hoest",
+            'version' => '0.1.0',
+            'icon' => 'trello',
+            'requires' => [
+                'PHP>=7.1',
+            ],
+            'installs' => [
+                'TrelloWireApi',
+            ]
+        ];
+    }
+
+    public function init()
+    {
+        
+    }
+
+    public function api()
+    {
+        if (!$this->api) {
+            $this->api = new TrelloWireApi($this->apiKey, $this->apiToken);
+        }
+        return $this->api;
+    }
+}
