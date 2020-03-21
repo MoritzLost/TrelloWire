@@ -4,12 +4,14 @@ namespace ProcessWire\TrelloWire;
 use ProcessWire\Wire;
 use ProcessWire\WireHttp;
 
-class TrelloWireApi extends Wire
+class TrelloWireApi
 {
+    public const API_BASE = 'https://api.trello.com/1/';
+
     protected $ApiKey;
     protected $ApiToken;
 
-    public const API_BASE = 'https://api.trello.com/1/';
+    public $lastRequest;
 
     public function __construct(string $ApiKey, string $ApiToken)
     {
@@ -40,6 +42,7 @@ class TrelloWireApi extends Wire
     protected function send(string $endpoint, string $method = 'GET', array $data = [])
     {
         $WireHttp = new WireHttp();
+        $this->lastRequest = $WireHttp;
         $url = self::API_BASE . ltrim($endpoint, '/');
         $data = array_merge(
             ['key' => $this->ApiKey, 'token' => $this->ApiToken],
@@ -60,12 +63,47 @@ class TrelloWireApi extends Wire
 
     public function isValidToken(): bool
     {
-        return $this->get(sprintf('tokens/%s?fields=dateExpires&webhooks=false', $this->ApiToken)) !== false;
+        $this->get(sprintf('tokens/%s?fields=dateExpires&webhooks=false', $this->ApiToken));
+        $httpResponseCode = $this->lastRequest->getHttpCode();
+        return $httpResponseCode >= 200 & $httpResponseCode < 300;
     }
 
-    // @TODO: add params
     public function boards(): array
     {
-        return json_decode($this->get('members/me/boards?fields=id,name,idOrganization&filter=open'));
+        // @TODO: add params: fields, filter
+        $result = $this->get('members/me/boards?fields=id,name,idOrganization&filter=open');
+        $responseCode = $this->lastRequest->getHttpCode();
+        if (!$this->isResponseCodeOk($responseCode)) {
+            throw new \InvalidArgumentException(sprintf($this->_('Error retrieving Trello boards. HTTP Code: %d'), $responseCode));
+        }
+        return json_decode($result);
+    }
+
+    public function lists(string $idBoard): array
+    {
+        // @TODO: add params: fields, filter
+        $result = $this->get("boards/${idBoard}/lists?cards=none&filter=open&fields=id,name,pos");
+        if (!$this->isResponseCodeOk($this->lastRequest->getHttpCode())) {
+            throw new \InvalidArgumentException(sprintf($this->_('Board with ID %s does not appear to exist.'), $idBoard));
+        }
+        return json_decode($result);
+    }
+
+    public function postCard(string $idList, string $title, string $body = '', array $addData = []): bool
+    {
+        $this->post('cards', array_merge(
+            $addData,
+            [
+                'name' => $title,
+                'desc' => $body,
+                'idList' => $idList
+            ]
+        ));
+        return $this->isResponseCodeOk($this->lastRequest->getHttpCode());
+    }
+
+    public function isResponseCodeOk(int $httpCode): bool
+    {
+        return $httpCode >= 200 && $httpCode < 300;
     }
 }

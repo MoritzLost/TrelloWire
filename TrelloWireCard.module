@@ -1,0 +1,29 @@
+<?php
+namespace ProcessWire;
+
+class TrelloWireCard extends WireData implements Module
+{
+    public static function getModuleInfo()
+    {
+        return [
+            'title' => __('Trello Wire Card'),
+            'summary' => __('TrelloWire: Card component (installed automatically).'),
+            'author' => "Moritz L'Hoest",
+            'version' => '0.1.0',
+            'icon' => 'trello',
+            'requires' => [
+                'PHP>=7.1',
+            ],
+        ];
+    }
+
+    public function ___setTitle(string $title)
+    {
+        $this->set('title', $title);
+    }
+
+    public function ___setBody(string $body)
+    {
+        $this->set('body', $body);
+    }
+}
