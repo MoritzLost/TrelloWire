@@ -17,13 +17,47 @@ class TrelloWireCard extends WireData implements Module
         ];
     }
 
-    public function ___setTitle(string $title)
+    /**
+     * Set the title / name of this card.
+     *
+     * @param string $title
+     * @return void
+     */
+    public function ___setTitle(string $title): void
     {
         $this->set('title', $title);
     }
 
-    public function ___setBody(string $body)
+    /**
+     * Set the body / description of this card.
+     *
+     * @param string $body
+     * @return void
+     */
+    public function ___setBody(string $body): void
     {
         $this->set('body', $body);
+    }
+
+    /**
+     * Set this cards ID (only used for cards that already exist in Trello).
+     *
+     * @param string $id
+     * @return void
+     */
+    public function ___setId(string $id): void
+    {
+        $this->set('id', $id);
+    }
+
+    /**
+     * Set the ID of the list this card belongs to.
+     *
+     * @param string $idList
+     * @return void
+     */
+    public function ___setList(string $idList): void
+    {
+        $this->set('list', $idList);
     }
 }
