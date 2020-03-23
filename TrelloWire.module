@@ -52,19 +52,20 @@ class TrelloWire extends Wire implements Module
 
     public function init()
     {
+        // @TODO: global switch to turn off all automatic module operations
         // setup page creation hook
         switch ($this->CardCreationTrigger) {
             case self::CREATE_ON_ADDED:
-                $this->addHookAfter('Pages::added', [$this, 'cardCreationHook']);
+                $this->addHookAfter('Pages::added', $this, 'cardCreationHook');
                 break;
             case self::CREATE_ON_PUBLISHED:
-                $this->addHookAfter('Pages::published', [$this, 'cardCreationHook']);
+                $this->addHookAfter('Pages::published', $this, 'cardCreationHook');
                 break;
         }
         // setup page update hooks
         if ($this->CardUpdate) {
             // @TODO: dont fire this if pages::published has already fired
-            $this->addHookAfter('Pages::saved', [$this, 'cardUpdateHook']);
+            // $this->addHookAfter('Pages::saved', $this, 'cardUpdateHook');
         }
     }
 
@@ -85,14 +86,22 @@ class TrelloWire extends Wire implements Module
      */
     protected function cardCreationHook(HookEvent $e) {
         $page = $e->arguments(0);
+        if (!in_array($page->template->id, $this->TrelloWireTemplates)) return;
         $card = $this->createCardFromPage($page);
         $response = $this->postCardToTrello($card);
-        if ($response) {
-            $page->wire()->message($this->_('Successfully created a new Trello card for this page!'));
-            // save the card ID to the page meta data so it can be updated later
-            $page->meta(self::CARD_REFERENCE_KEY, $response->id);
-        } else {
-            $page->error($this->_('An error occured while attempting to create a new card on Trello.'));
+        if (!$response) {
+            return $page->error($this->_('An error occured while attempting to create a new card on Trello.'));
+        }
+        $page->wire()->message($this->_('Successfully created a new Trello card for this page!'));
+        // save the card ID to the page meta data so it can be updated later
+        $page->meta(self::CARD_REFERENCE_KEY, $response->id);
+        $checklistItems = $this->getDefaultChecklistItems();
+        if (!empty($checklistItems)) {
+            $checklistTitle = $this->getDefaultChecklistTitle();
+            $checklist = $this->api()->addChecklistToCard($response->id, $checklistTitle);
+            foreach ($checklistItems as $item) {
+                $this->api()->addItemToChecklist($checklist->id, $item);
+            }
         }
     }
 
@@ -104,10 +113,9 @@ class TrelloWire extends Wire implements Module
      */
     protected function cardUpdateHook(HookEvent $e) {
         $page = $e->arguments(0);
+        if (!in_array($page->template->name, $this->TrelloWireTemplates)) return;
         $card = $this->createCardFromPage($page);
-        bd($card);
         $response = $this->updateCardOnTrello($card);
-        bd($response);
         if (!$response) {
             $page->message($this->_('The card associated with this page could not be updated. It may have been deleted manually.'));
         } else {
@@ -138,6 +146,9 @@ class TrelloWire extends Wire implements Module
         if ($existingCardId) {
             $TrelloWireCard->setId($existingCardId);
         }
+        if (!empty($this->CardLabels)) {
+            $TrelloWireCard->setLabels($this->CardLabels);
+        }
         return $TrelloWireCard;
     }
 
@@ -150,7 +161,9 @@ class TrelloWire extends Wire implements Module
     public function ___postCardToTrello(TrelloWireCard $card)
     {
         if (!$card->list) return false;
-        return $this->api()->postCard($card->list, $card->title, $card->body);
+        return $this->api()->postCard($card->list, $card->title, $card->body, array_filter([
+            'idLabels' => $card->labels ? implode(',', $card->labels) : null,
+        ]));
     }
 
     /**
@@ -163,5 +176,21 @@ class TrelloWire extends Wire implements Module
     {
         if (!$card->id) return false;
         return $this->api()->updateCard($card->id, $card->title, $card->body);
+    }
+
+    public function ___getDefaultChecklistTitle(): string
+    {
+        return $this->CardChecklistTitle ?: (new TrelloWireConfig())->getDefaults()['CardChecklistTitle'];
+    }
+
+    public function ___getDefaultChecklistItems(): array
+    {
+        if (!$this->CardChecklistItems) return [];
+        return array_filter(
+            preg_split('/[\n\r]+/', $this->CardChecklistItems),
+            function ($item) {
+                return !empty($item);
+            }
+        );
     }
 }

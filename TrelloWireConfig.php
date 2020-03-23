@@ -19,6 +19,9 @@ class TrelloWireConfig extends ModuleConfig
             'TrelloWireTemplates' => [],
             'CardTitle' => 'title',
             'CardBody' => '',
+            'CardLabels' => [],
+            'CardChecklistItems' => '',
+            'CardChecklistTitle' => 'Checklist',
             'CardCreationTrigger' => TrelloWire::CREATE_ON_PUBLISHED,
             'CardUpdate' => true,
             'StatusChangeHidden' => TrelloWire::STATUS_CHANGE_NO_ACTION,
@@ -90,7 +93,7 @@ class TrelloWireConfig extends ModuleConfig
             $TrelloWireApi = $TrelloWire->api();
 
             try {
-                $availableLists = $TrelloWireApi->lists($TrelloWire->TargetBoard);
+                $availableLists = $TrelloWire->TargetBoard ? $TrelloWireApi->lists($TrelloWire->TargetBoard) : null;
             } catch (Throwable $e) {
                 $availableLists = null;
             }
@@ -99,6 +102,7 @@ class TrelloWireConfig extends ModuleConfig
             $TargetBoard->name = 'TargetBoard';
             $TargetBoard->label = $this->_('Trello target board');
             $TargetBoard->description = $this->_('Select the default Trello board to add new cards to.');
+            $TargetBoard->required = true;
             $TargetBoard->columnWidth = 50;
             $TargetBoard->collapsed = Inputfield::collapsedNever;
             $availableBoards = $TrelloWireApi->boards();
@@ -110,22 +114,22 @@ class TrelloWireConfig extends ModuleConfig
             $TargetList->label = $this->_('Trello target list');
             $TargetList->description = $this->_('Select the default Trello list inside your selected board to add new cards to.');
             $TargetList->notes = $this->_('After changing the target board, submit the form to see available lists inside the board.');
+            $TargetList->required = !empty($TrelloWire->TargetBoard);
             $TargetList->columnWidth = 50;
             $TargetList->collapsed = Inputfield::collapsedNever;
             // @TODO: if the selected board doesnt have this list, delete the currently saved option
             if (!$TrelloWire->TargetBoard) {
                 $this->disableField($TargetList);
+            } elseif ($availableLists) {
+                $TargetList->setOptions(array_combine(array_column($availableLists, 'id'), array_column($availableLists, 'name')));
             } else {
-                if (null !== $availableLists) {
-                    $TargetList->setOptions(array_combine(array_column($availableLists, 'id'), array_column($availableLists, 'name')));
-                } else {
-                    $TargetList->error($this->_('Error retrieving lists for this board. The board may have been deleted.'));
-                }
+                $TargetList->value = '';
+                $TargetList->error($this->_('Error retrieving lists for this board. The board may have been deleted.'));
             }
 
             $TrelloWireTemplates = wire()->modules->get('InputfieldAsmSelect');
             $TrelloWireTemplates->name = 'TrelloWireTemplates';
-            $TrelloWireTemplates->label = $this->_('Templates to create trello cards for.');
+            $TrelloWireTemplates->label = $this->_('Templates to create trello cards for');
             $TrelloWireTemplates->setAsmSelectOption('sortable', false);
             $TrelloWireTemplates->columnWidth = 34;
             $TrelloWireTemplates->collapsed = Inputfield::collapsedNever;
@@ -133,16 +137,56 @@ class TrelloWireConfig extends ModuleConfig
 
             $CardTitle = wire()->modules->get('InputfieldText');
             $CardTitle->name = 'CardTitle';
-            $CardTitle->required = true;
             $CardTitle->label = $this->_('Card title (field selector)');
-            $CardTitle->columnWidth = 34;
+            $CardTitle->required = true;
+            $CardTitle->columnWidth = 33;
             $CardTitle->collapsed = Inputfield::collapsedNever;
-    
+
             $CardBody = wire()->modules->get('InputfieldTextarea');
             $CardBody->name = 'CardBody';
             $CardBody->label = $this->_('Card body (field selector)');
             $CardBody->columnWidth = 33;
             $CardBody->collapsed = Inputfield::collapsedNever;
+
+            $CardLabels = wire()->modules->get('InputfieldCheckboxes');
+            $CardLabels->name = 'CardLabels';
+            $CardLabels->label = $this->_('Card labels');
+            $CardLabels->columnWidth = 34;
+            $CardLabels->collapsed = Inputfield::collapsedNever;
+            try {
+                $availableLabels = $TrelloWire->TargetBoard ? $TrelloWireApi->labels($TrelloWire->TargetBoard) : null;
+                if ($availableLabels) {
+                    $CardLabels->addOptions(array_combine(
+                        array_column($availableLabels, 'id'),
+                        array_map(function ($labelData) {
+                            if ($labelData->color && $labelData->name) {
+                                return sprintf('%s (%s)', $labelData->name, $labelData->color);
+                            } else {
+                                return $labelData->name ?: $labelData->color;
+                            }
+                        }, $availableLabels)
+                    ));
+                } else {
+                    $this->disableField($CardLabels);
+                    $CardLabels->description = $this->_('Available labels depend on the selected board. Please select a valid target board first.');
+                }
+            } catch (Throwable $e) {
+                $this->disableField($CardLabels);
+                $CardLabels->description = $this->_('Error retrieving available labels. Please select a valid target board first.');
+            }
+
+            $CardChecklistItems = wire()->modules->get('InputfieldTextarea');
+            $CardChecklistItems->name = 'CardChecklistItems';
+            $CardChecklistItems->label = $this->_('Card checklist items');
+            $CardChecklistItems->columnWidth = 33;
+            $CardChecklistItems->collapsed = Inputfield::collapsedNever;
+
+            $CardChecklistTitle = wire()->modules->get('InputfieldText');
+            $CardChecklistTitle->name = 'CardChecklistTitle';
+            $CardChecklistTitle->label = $this->_('Card checklist title');
+            $CardChecklistTitle->showIf("CardChecklistItems!=''");
+            $CardChecklistTitle->columnWidth = 33;
+            $CardChecklistTitle->collapsed = Inputfield::collapsedNever;
 
             $TrelloTargetSettings = wire()->modules->get('InputfieldFieldset');
             $TrelloTargetSettings->label = $this->_('Trello settings for new cards');
@@ -153,6 +197,9 @@ class TrelloWireConfig extends ModuleConfig
             $TrelloTargetSettings->add($TrelloWireTemplates);
             $TrelloTargetSettings->add($CardTitle);
             $TrelloTargetSettings->add($CardBody);
+            $TrelloTargetSettings->add($CardLabels);
+            $TrelloTargetSettings->add($CardChecklistItems);
+            $TrelloTargetSettings->add($CardChecklistTitle);
 
             $CardCreationTrigger = wire()->modules->get('InputfieldRadios');
             $CardCreationTrigger->name = 'CardCreationTrigger';
@@ -206,7 +253,12 @@ class TrelloWireConfig extends ModuleConfig
                 $MoveListTarget->label = $this->_('Select the list to move the card to');
                 $MoveListTarget->columnWidth = 33;
                 $MoveListTarget->collapsed = Inputfield::collapsedNever;
-                $MoveListTarget->setOptions(array_combine(array_column($availableLists, 'id'), array_column($availableLists, 'name')));
+                if ($availableLists) {
+                    $MoveListTarget->setOptions(array_combine(array_column($availableLists, 'id'), array_column($availableLists, 'name')));
+                } else {
+                    $this->disableField($MoveListTarget);
+                    $MoveListTarget->description = $this->_('Please select a valid target board first.');
+                }
                 $MoveListTarget->showIf(sprintf('%s=%s', $fieldName, TrelloWire::STATUS_CHANGE_MOVE));
                 $MoveListTarget->requiredIf(sprintf('%s=%s', $fieldName, TrelloWire::STATUS_CHANGE_MOVE));
                 $StatusChanges->add($MoveListTarget);

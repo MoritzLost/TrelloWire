@@ -4,7 +4,7 @@ namespace ProcessWire\TrelloWire;
 use ProcessWire\Wire;
 use ProcessWire\WireHttp;
 
-class TrelloWireApi
+class TrelloWireApi extends Wire
 {
     /** @var string The base URL for the Trello API. */
     public const API_BASE = 'https://api.trello.com/1/';
@@ -170,6 +170,16 @@ class TrelloWireApi
         return json_decode($result);
     }
 
+    public function labels(string $idBoard): array
+    {
+        $result = $this->get(sprintf(
+            'boards/%1$s/labels',
+            $idBoard
+        ));
+        // @TODO: check response code, throw on error
+        return json_decode($result);
+    }
+
     /**
      * Post a new card to the specified list. Returns true on success, false on failure.
      *
@@ -200,6 +210,25 @@ class TrelloWireApi
         ]));
         $result = $this->put(sprintf('cards/%s', $id), $updateFields);
         return $this->isResponseCodeOk($this->lastRequest->getHttpCode()) ? json_decode($result) : false;
+    }
+
+    public function addChecklistToCard(string $idCard, string $title)
+    {
+        $result = $this->post('checklists', [
+            'idCard' => $idCard,
+            'name' => $title,
+        ]);
+        return $this->isResponseCodeOk($this->lastRequest->getHttpCode()) ? json_decode($result) : false;
+    }
+
+    public function addItemToChecklist(string $idChecklist, string $title, bool $checked = false, $position = 'bottom')
+    {
+        $result = $this->post(sprintf('checklists/%s/checkItems', $idChecklist), [
+            'name' => $title,
+            'checked' => $checked,
+            'pos' => $position
+        ]);
+        return $this->isResponseCodeOk($this->lastRequest->getHttpCode()) ? true : false;
     }
 
     /**

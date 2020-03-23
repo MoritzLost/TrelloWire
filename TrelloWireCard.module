@@ -12,9 +12,31 @@ class TrelloWireCard extends WireData implements Module
             'version' => '0.1.0',
             'icon' => 'trello',
             'requires' => [
-                'PHP>=7.1',
+                'PHP>=7.2',
             ],
         ];
+    }
+
+    /**
+     * Set this cards ID (only used for cards that already exist in Trello).
+     *
+     * @param string $id
+     * @return void
+     */
+    public function ___setId(string $id): void
+    {
+        $this->set('id', $id);
+    }
+
+    /**
+     * Set the ID of the list this card belongs to.
+     *
+     * @param string $idList
+     * @return void
+     */
+    public function ___setList(string $idList): void
+    {
+        $this->set('list', $idList);
     }
 
     /**
@@ -39,25 +61,8 @@ class TrelloWireCard extends WireData implements Module
         $this->set('body', $body);
     }
 
-    /**
-     * Set this cards ID (only used for cards that already exist in Trello).
-     *
-     * @param string $id
-     * @return void
-     */
-    public function ___setId(string $id): void
+    public function ___setLabels(array $labelIds): void
     {
-        $this->set('id', $id);
-    }
-
-    /**
-     * Set the ID of the list this card belongs to.
-     *
-     * @param string $idList
-     * @return void
-     */
-    public function ___setList(string $idList): void
-    {
-        $this->set('list', $idList);
+        $this->set('labels', $labelIds);
     }
 }
