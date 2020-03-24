@@ -86,7 +86,7 @@ class TrelloWire extends Wire implements Module
      */
     protected function cardCreationHook(HookEvent $e) {
         $page = $e->arguments(0);
-        if (!in_array($page->template->id, $this->TrelloWireTemplates)) return;
+        if (!in_array($page->template->name, $this->TrelloWireTemplates)) return;
         $card = $this->createCardFromPage($page);
         $response = $this->postCardToTrello($card);
         if (!$response) {

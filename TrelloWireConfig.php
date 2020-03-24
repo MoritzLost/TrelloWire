@@ -133,7 +133,7 @@ class TrelloWireConfig extends ModuleConfig
             $TrelloWireTemplates->setAsmSelectOption('sortable', false);
             $TrelloWireTemplates->columnWidth = 34;
             $TrelloWireTemplates->collapsed = Inputfield::collapsedNever;
-            $this->asmSelectAddTemplates($TrelloWireTemplates);
+            $this->addTemplatesToMultiSelect($TrelloWireTemplates);
 
             $CardTitle = wire()->modules->get('InputfieldText');
             $CardTitle->name = 'CardTitle';
@@ -282,15 +282,29 @@ class TrelloWireConfig extends ModuleConfig
         return $inputfields;
     }
 
-    protected function asmSelectAddTemplates(InputfieldAsmSelect $asm): void
+    /**
+     * Add options for all templates to an inputfield. Option values are template
+     * names, display titles use the template's label if it has one. Includes system
+     * templates in advanced mode.
+     *
+     * @param InputfieldAsmSelect $inputfield
+     * @return void
+     */
+    protected function addTemplatesToMultiSelect(InputfieldSelectMultiple $inputfield): void
     {
         foreach (wire('templates') as $template) {
             if (!wire('config')->advanced && ($template->flags & Template::flagSystem)) continue;
             $displayName = $template->label ? "{$template->label} ({$template->name})" : $template->name;
-            $asm->addOption($template->id, $displayName);
+            $inputfield->addOption($template->name, $displayName);
         }
     }
 
+    /**
+     * Disable an inputfield by adding a disabled attribute and adding some styling.
+     *
+     * @param Inputfield $inputfield
+     * @return void
+     */
     protected function disableField(Inputfield $inputfield): void
     {
         // @TODO: cleaner "disabled" status & styling
@@ -298,6 +312,11 @@ class TrelloWireConfig extends ModuleConfig
         $inputfield->attr('style', 'background: #ccc; cursor: not-allowed;');
     }
 
+    /**
+     * Get the labels used for the status change options.
+     *
+     * @return array
+     */
     protected function statusChangeFieldLabels(): array
     {
         return [

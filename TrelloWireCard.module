@@ -61,6 +61,13 @@ class TrelloWireCard extends WireData implements Module
         $this->set('body', $body);
     }
 
+    /**
+     * Set the IDs of labels belonging to this cards. Note that label IDs are
+     * specific to each board.
+     *
+     * @param array $labelIds
+     * @return void
+     */
     public function ___setLabels(array $labelIds): void
     {
         $this->set('labels', $labelIds);
