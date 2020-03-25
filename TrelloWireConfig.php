@@ -47,7 +47,7 @@ class TrelloWireConfig extends ModuleConfig
         $currentApiToken = $TrelloWire->ApiToken;
         $hasApiKey = !empty($currentApiKey);
         $hasApiToken = !empty($currentApiToken);
-        $hasInvalidToken = $hasApiToken ? !$TrelloWire->api()->isValidToken() : false;
+        $hasInvalidToken = $hasApiKey && $hasApiToken ? !$TrelloWire->api()->isValidToken() : false;
 
         $ApiKey = wire()->modules->get('InputfieldText');
         $ApiKey->name = 'ApiKey';

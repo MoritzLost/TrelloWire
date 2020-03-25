@@ -53,46 +53,120 @@ class TrelloWire extends Wire implements Module
     public function init()
     {
         // @TODO: global switch to turn off all automatic module operations
-        // setup page creation hook
-        switch ($this->CardCreationTrigger) {
-            case self::CREATE_ON_ADDED:
-                $this->addHookAfter('Pages::added', $this, 'cardCreationHook');
-                break;
-            case self::CREATE_ON_PUBLISHED:
-                $this->addHookAfter('Pages::published', $this, 'cardCreationHook');
-                break;
-        }
-        // setup page update hooks
-        if ($this->CardUpdate) {
-            // @TODO: dont fire this if pages::published has already fired
-            // $this->addHookAfter('Pages::saved', $this, 'cardUpdateHook');
+        if ($this->ApiKey && $this->ApiToken) {
+            // hook after a page is saved, this will handle all card & status updates
+            $this->addHookAfter('Pages::saved', $this, 'pageSaveHook');
+            // special case: create cards as soon as a page is added, this can't
+            // be determined inside the Pages::saved hook
+            if ($this->CardCreationTrigger === self::CREATE_ON_ADDED) {
+                $this->addHookAfter('Pages::added', $this, 'pageAddedHook');
+            }
+            // @TODO: DELETED hook & functionality
         }
     }
 
-    public function api()
+    public function api(): ?TrelloWireApi
     {
         if (!$this->api) {
+            if (!$this->ApiKey || !$this->ApiToken) {
+                return null;
+            }
             $this->api = new TrelloWireApi($this->ApiKey, $this->ApiToken);
         }
         return $this->api;
     }
 
-    /**
-     * This hook handles setting up and posting a new card to Trello for newly
-     * created or published pages.
-     *
-     * @param HookEvent $e
-     * @return void
-     */
-    protected function cardCreationHook(HookEvent $e) {
+    public function pageSaveHook(HookEvent $e)
+    {
         $page = $e->arguments(0);
         if (!in_array($page->template->name, $this->TrelloWireTemplates)) return;
-        $card = $this->createCardFromPage($page);
+        // @TODO: check if the API key is valid ...
+        $card = $this->buildCardData($page);
+        $isExistingCard = !empty($card->id);
+        // find all status changes
+        $prevStatus = $page->statusPrevious;
+        $statusChanged = null !== $prevStatus;
+        $wasPublished = $statusChanged && !$page->isUnpublished() && (($prevStatus & Page::statusUnpublished) === Page::statusUnpublished);
+        $wasUnpublished = $statusChanged && $page->isUnpublished() && !($prevStatus & Page::statusUnpublished);
+        $wasHidden = $statusChanged && $page->isHidden() && !($prevStatus & Page::statusHidden);
+        $wasUnhidden = $statusChanged && !$page->isHidden() && (($prevStatus & Page::statusHidden) === Page::statusHidden);
+        $wasTrashed = $statusChanged && $page->isTrash() && !($prevStatus & Page::statusTrash);
+        $wasRestored = $statusChanged && !$page->isTrash() && (($prevStatus & Page::statusTrash) === Page::statusTrash);
+
+        if (!$isExistingCard) {
+            // if the card doesn't already exist on trello, and the module is
+            // set to create cards upon publishing, do so now
+            if ($wasPublished && $this->CardCreationTrigger === self::CREATE_ON_PUBLISHED) {
+                $this->createCardForPage($card, $page);
+            }
+            // early return: all other updates only apply only to existing cards
+            return;
+        }
+
+        // update existing cards
+        if ($this->CardUpdate && !$wasTrashed && !$wasRestored) {
+            $response = $this->updateCardOnTrello($card);
+            if (!$response) {
+                $page->message($this->_('The card associated with this page could not be updated. It may have been deleted manually.'));
+            } else {
+                $page->message($this->_('Successfully updated the Trello card associated with this page.'));
+            }
+        }
+
+        // @TODO: Handle status change options
+    }
+
+    public function pageAddedHook(HookEvent $e): void
+    {
+        $page = $e->arguments(0);
+        if (!in_array($page->template->name, $this->TrelloWireTemplates)) return;
+        $this->createCardForPage($this->buildCardData($page), $page);
+    }
+
+    /**
+    * Construct a new TrelloWireCard instance based on the passed page using the
+    * module settings.
+    *
+    * @param Page $page        The page this card will belong to.
+    * @return TrelloWireCard   The card object with values based on the page.
+    */
+   public function ___buildCardData(Page $page): TrelloWireCard
+   {
+       $TrelloWireCard = $this->modules->get('TrelloWireCard');
+       $TrelloWireCard->setList($this->TargetList);
+       $defaultSettings = (new TrelloWireConfig())->getDefaults();
+       $titleField = !empty($this->CardTitle) ? $this->CardTitle : $defaultSettings['CardTitle'];
+       $TrelloWireCard->setTitle($page->getText($titleField, true, false));
+       if (!empty($this->CardBody)) {
+           $TrelloWireCard->setBody($page->getMarkup($this->CardBody));
+       }
+       // for existing cards (card id stored in page settings), restore the id
+       $existingCardId = $page->meta(self::CARD_REFERENCE_KEY);
+       if ($existingCardId) {
+           $TrelloWireCard->setId($existingCardId);
+       }
+       if (!empty($this->CardLabels)) {
+           $TrelloWireCard->setLabels($this->CardLabels);
+       }
+       return $TrelloWireCard;
+   }
+
+   /**
+    * Create a card for a page. This automatically extract relevant data from the
+    * page based on the current settings and create the card on trello through the
+    * API. It also creates the default checklist defined through the settings.
+    *
+    * @param Page $page
+    * @param TrelloWireCard $card
+    * @return void
+    */
+    public function ___createCardForPage(TrelloWireCard $card, Page $page)
+    {
         $response = $this->postCardToTrello($card);
         if (!$response) {
             return $page->error($this->_('An error occured while attempting to create a new card on Trello.'));
         }
-        $page->wire()->message($this->_('Successfully created a new Trello card for this page!'));
+        $page->message($this->_('Successfully created a new Trello card for this page!'));
         // save the card ID to the page meta data so it can be updated later
         $page->meta(self::CARD_REFERENCE_KEY, $response->id);
         $checklistItems = $this->getDefaultChecklistItems();
@@ -106,53 +180,6 @@ class TrelloWire extends Wire implements Module
     }
 
     /**
-     * This hook handles updating the Trello card whenever a page is updated (saved).
-     *
-     * @param HookEvent $e
-     * @return void
-     */
-    protected function cardUpdateHook(HookEvent $e) {
-        $page = $e->arguments(0);
-        if (!in_array($page->template->name, $this->TrelloWireTemplates)) return;
-        $card = $this->createCardFromPage($page);
-        $response = $this->updateCardOnTrello($card);
-        if (!$response) {
-            $page->message($this->_('The card associated with this page could not be updated. It may have been deleted manually.'));
-        } else {
-            $page->wire()->message($this->_('Successfully updated the Trello card associated with this page.'));
-        }
-    }
-
-    /**
-     * Set up a new TrelloWireCard based on the passed page using the module settings.
-     * Hook after this if you want to modify the card's attributes before it is
-     * posted to Trello.
-     *
-     * @param Page $page        The page this card will belong to.
-     * @return TrelloWireCard   The card object with values based on the page.
-     */
-    public function ___createCardFromPage(Page $page): TrelloWireCard
-    {
-        $TrelloWireCard = $this->modules->get('TrelloWireCard');
-        $TrelloWireCard->setList($this->TargetList);
-        $defaultSettings = (new TrelloWireConfig())->getDefaults();
-        $titleField = !empty($this->CardTitle) ? $this->CardTitle : $defaultSettings['CardTitle'];
-        $TrelloWireCard->setTitle($page->getText($titleField, true, false));
-        if (!empty($this->CardBody)) {
-            $TrelloWireCard->setBody($page->getMarkup($this->CardBody));
-        }
-        // for existing cards (card id stored in page settings), restore the id
-        $existingCardId = $page->meta(self::CARD_REFERENCE_KEY);
-        if ($existingCardId) {
-            $TrelloWireCard->setId($existingCardId);
-        }
-        if (!empty($this->CardLabels)) {
-            $TrelloWireCard->setLabels($this->CardLabels);
-        }
-        return $TrelloWireCard;
-    }
-
-    /**
      * Create a new Trello card through the API based on a TrelloWireCard instance.
      *
      * @param TrelloWireCard $card  The card with the values to post to Trello.
@@ -161,7 +188,8 @@ class TrelloWire extends Wire implements Module
     public function ___postCardToTrello(TrelloWireCard $card)
     {
         if (!$card->list) return false;
-        return $this->api()->postCard($card->list, $card->title, $card->body, array_filter([
+        if (!$api = $this->api()) return null;
+        return $api->postCard($card->list, $card->title, $card->body, array_filter([
             'idLabels' => $card->labels ? implode(',', $card->labels) : null,
         ]));
     }
@@ -175,7 +203,8 @@ class TrelloWire extends Wire implements Module
     public function ___updateCardOnTrello(TrelloWireCard $card)
     {
         if (!$card->id) return false;
-        return $this->api()->updateCard($card->id, $card->title, $card->body);
+        if (!$api = $this->api()) return null;
+        return $api->updateCard($card->id, $card->title, $card->body);
     }
 
     public function ___getDefaultChecklistTitle(): string
