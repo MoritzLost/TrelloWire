@@ -24,15 +24,19 @@ class TrelloWireConfig extends ModuleConfig
             'CardChecklistTitle' => 'Checklist',
             'CardCreationTrigger' => TrelloWire::CREATE_ON_PUBLISHED,
             'CardUpdate' => true,
+
             'StatusChangeHidden' => TrelloWire::STATUS_CHANGE_NO_ACTION,
             'MoveListTargetHidden' => '',
             'RestoreOnReverseHidden' => false,
+
             'StatusChangeUnpublished' => TrelloWire::STATUS_CHANGE_NO_ACTION,
             'MoveListTargetUnpublished' => '',
             'RestoreOnReverseUnpublished' => false,
+
             'StatusChangeTrashed' => TrelloWire::STATUS_CHANGE_ARCHIVE,
             'MoveListTargetTrashed' => '',
             'RestoreOnReverseTrashed' => true,
+
             'StatusChangeDeleted' => TrelloWire::STATUS_CHANGE_DELETE,
             'MoveListTargetDeleted' => '',
         ];
@@ -49,20 +53,10 @@ class TrelloWireConfig extends ModuleConfig
         $hasApiToken = !empty($currentApiToken);
         $hasInvalidToken = $hasApiKey && $hasApiToken ? !$TrelloWire->api()->isValidToken() : false;
 
-        $ApiKey = wire()->modules->get('InputfieldText');
-        $ApiKey->name = 'ApiKey';
-        $ApiKey->label = $this->_('Trello API key');
-        $ApiKey->columnWidth = 50;
-        $ApiKey->collapsed = Inputfield::collapsedNever;
-        $ApiKey->required = true;
+        $ApiKey = $this->buildInputfield('InputfieldText', 'ApiKey', $this->_('Trello API Key'), 50, Inputfield::collapsedNever, true);
         $ApiKey->description = sprintf($this->_('You can [generate your API key here](%s).'), 'https://trello.com/app-key');
 
-        $ApiToken = wire()->modules->get('InputfieldText');
-        $ApiToken->name = 'ApiToken';
-        $ApiToken->label = $this->_('Trello API token');
-        $ApiToken->columnWidth = 50;
-        $ApiToken->collapsed = Inputfield::collapsedNever;
-        $ApiToken->required = $hasApiKey;
+        $ApiToken = $this->buildInputfield('InputfieldText', 'ApiToken', $this->_('Trello API Token'), 50, Inputfield::collapsedNever, $hasApiKey);
         $tokenFieldDescription = $hasApiKey
             ? $this->_('[Generate your access token using this link](%s).')
             : $this->_('Please set your API key first.');
@@ -98,25 +92,15 @@ class TrelloWireConfig extends ModuleConfig
                 $availableLists = null;
             }
 
-            $TargetBoard = wire()->modules->get('InputfieldSelect');
-            $TargetBoard->name = 'TargetBoard';
-            $TargetBoard->label = $this->_('Trello target board');
+            $TargetBoard = $this->buildInputfield('InputfieldSelect', 'TargetBoard', $this->_('Trello target board'), 50, Inputfield::collapsedNever, true);
             $TargetBoard->description = $this->_('Select the default Trello board to add new cards to.');
-            $TargetBoard->required = true;
-            $TargetBoard->columnWidth = 50;
-            $TargetBoard->collapsed = Inputfield::collapsedNever;
             $availableBoards = $TrelloWireApi->boards();
             $TargetBoard->setOptions(array_combine(array_column($availableBoards, 'id'), array_column($availableBoards, 'name')));
             // @TODO: option groups for organizations
 
-            $TargetList = wire()->modules->get('InputfieldSelect');
-            $TargetList->name = 'TargetList';
-            $TargetList->label = $this->_('Trello target list');
+            $TargetList = $this->buildInputfield('InputfieldSelect', 'TargetList', $this->_('Trello target list'), 50, Inputfield::collapsedNever, !empty($TrelloWire->TargetBoard));
             $TargetList->description = $this->_('Select the default Trello list inside your selected board to add new cards to.');
             $TargetList->notes = $this->_('After changing the target board, submit the form to see available lists inside the board.');
-            $TargetList->required = !empty($TrelloWire->TargetBoard);
-            $TargetList->columnWidth = 50;
-            $TargetList->collapsed = Inputfield::collapsedNever;
             // @TODO: if the selected board doesnt have this list, delete the currently saved option
             if (!$TrelloWire->TargetBoard) {
                 $this->disableField($TargetList);
@@ -127,32 +111,15 @@ class TrelloWireConfig extends ModuleConfig
                 $TargetList->error($this->_('Error retrieving lists for this board. The board may have been deleted.'));
             }
 
-            $TrelloWireTemplates = wire()->modules->get('InputfieldAsmSelect');
-            $TrelloWireTemplates->name = 'TrelloWireTemplates';
-            $TrelloWireTemplates->label = $this->_('Templates to create trello cards for');
+            $TrelloWireTemplates = $this->buildInputfield('InputfieldAsmSelect', 'TrelloWireTemplates', $this->_('Templates to create trello cards for'), 34);
             $TrelloWireTemplates->setAsmSelectOption('sortable', false);
-            $TrelloWireTemplates->columnWidth = 34;
-            $TrelloWireTemplates->collapsed = Inputfield::collapsedNever;
             $this->addTemplatesToMultiSelect($TrelloWireTemplates);
 
-            $CardTitle = wire()->modules->get('InputfieldText');
-            $CardTitle->name = 'CardTitle';
-            $CardTitle->label = $this->_('Card title (field selector)');
-            $CardTitle->required = true;
-            $CardTitle->columnWidth = 33;
-            $CardTitle->collapsed = Inputfield::collapsedNever;
+            $CardTitle = $this->buildInputfield('InputfieldText', 'CardTitle', $this->_('Card title (field selector)'), 33, Inputfield::collapsedNever, true);
 
-            $CardBody = wire()->modules->get('InputfieldTextarea');
-            $CardBody->name = 'CardBody';
-            $CardBody->label = $this->_('Card body (field selector)');
-            $CardBody->columnWidth = 33;
-            $CardBody->collapsed = Inputfield::collapsedNever;
+            $CardBody = $this->buildInputfield('InputfieldTextarea', 'CardBody', $this->_('Card body (field selector)'), 33);
 
-            $CardLabels = wire()->modules->get('InputfieldCheckboxes');
-            $CardLabels->name = 'CardLabels';
-            $CardLabels->label = $this->_('Card labels');
-            $CardLabels->columnWidth = 34;
-            $CardLabels->collapsed = Inputfield::collapsedNever;
+            $CardLabels = $this->buildInputfield('InputfieldCheckboxes', 'CardLabels', $this->_('Card labels'), 34);
             try {
                 $availableLabels = $TrelloWire->TargetBoard ? $TrelloWireApi->labels($TrelloWire->TargetBoard) : null;
                 if ($availableLabels) {
@@ -175,23 +142,14 @@ class TrelloWireConfig extends ModuleConfig
                 $CardLabels->description = $this->_('Error retrieving available labels. Please select a valid target board first.');
             }
 
-            $CardChecklistItems = wire()->modules->get('InputfieldTextarea');
-            $CardChecklistItems->name = 'CardChecklistItems';
-            $CardChecklistItems->label = $this->_('Card checklist items');
-            $CardChecklistItems->columnWidth = 33;
-            $CardChecklistItems->collapsed = Inputfield::collapsedNever;
+            $CardChecklistItems = $this->buildInputfield('InputfieldTextarea', 'CardChecklistItems', $this->_('Card checklist items'), 33);
 
-            $CardChecklistTitle = wire()->modules->get('InputfieldText');
-            $CardChecklistTitle->name = 'CardChecklistTitle';
-            $CardChecklistTitle->label = $this->_('Card checklist title');
+            $CardChecklistTitle = $this->buildInputfield('InputfieldText', 'CardChecklistTitle', $this->_('Card checklist title'), 33);
             $CardChecklistTitle->showIf("CardChecklistItems!=''");
-            $CardChecklistTitle->columnWidth = 33;
-            $CardChecklistTitle->collapsed = Inputfield::collapsedNever;
 
             $TrelloTargetSettings = wire()->modules->get('InputfieldFieldset');
             $TrelloTargetSettings->label = $this->_('Trello settings for new cards');
             $TrelloTargetSettings->collapsed = Inputfield::collapsedNo;
-
             $TrelloTargetSettings->add($TargetBoard);
             $TrelloTargetSettings->add($TargetList);
             $TrelloTargetSettings->add($TrelloWireTemplates);
@@ -201,29 +159,20 @@ class TrelloWireConfig extends ModuleConfig
             $TrelloTargetSettings->add($CardChecklistItems);
             $TrelloTargetSettings->add($CardChecklistTitle);
 
-            $CardCreationTrigger = wire()->modules->get('InputfieldRadios');
-            $CardCreationTrigger->name = 'CardCreationTrigger';
-            $CardCreationTrigger->label = $this->_('When should new cards be created?');
+            $CardCreationTrigger = $this->buildInputfield('InputfieldRadios', 'CardCreationTrigger', $this->_('When should new cards be created?'), 50);
             $CardCreationTrigger->addOptions([
                 TrelloWire::CREATE_NEVER => $this->_("Never create cards automatically"),
                 TrelloWire::CREATE_ON_ADDED => $this->_('Create new cards whenever an applicable page is added'),
                 TrelloWire::CREATE_ON_PUBLISHED => $this->_('Create new cards whenever an applicable page is published'),
             ]);
-            $CardCreationTrigger->columnWidth = 50;
-            $CardCreationTrigger->collapsed = Inputfield::collapsedNever;
 
-            $CardUpdate = wire()->modules->get('InputfieldCheckbox');
-            $CardUpdate->name = 'CardUpdate';
-            $CardUpdate->label = $this->_('Page update handling');
+            $CardUpdate = $this->buildInputfield('InputfieldCheckbox', 'CardUpdate', $this->_('Page update handling'), 50);
             $CardUpdate->label2 = $this->_('Update Trello cards when pages are updated');
             $CardUpdate->description = $this->_('When a page with a reference to a card is saved, update the card on Trello?');
-            $CardUpdate->columnWidth = 50;
-            $CardUpdate->collapsed = Inputfield::collapsedNever;
 
             $CardSyncSettings = wire()->modules->get('InputfieldFieldset');
             $CardSyncSettings->label = $this->_('Card creation and update settings');
             $CardSyncSettings->collapsed = Inputfield::collapsedNo;
-
             $CardSyncSettings->add($CardCreationTrigger);
             $CardSyncSettings->add($CardUpdate);
 
@@ -234,25 +183,16 @@ class TrelloWireConfig extends ModuleConfig
             $StatusChangeLabels = $this->statusChangeFieldLabels();
             foreach (['Hidden', 'Unpublished', 'Trashed', 'Deleted'] as $status) {
                 $fieldName = "StatusChange{$status}";
-                $StatusChangeOptions = wire()->modules->get('InputfieldRadios');
-                $StatusChangeOptions->name = $fieldName;
-                $StatusChangeOptions->label = $StatusChangeLabels[$status]['label'];
+                $StatusChangeOptions = $this->buildInputfield('InputfieldRadios', $fieldName, $StatusChangeLabels[$status]['label'], 34, Inputfield::collapsedNever, true);
                 $StatusChangeOptions->addOptions([
                     TrelloWire::STATUS_CHANGE_NO_ACTION => $this->_('Do nothing'),
                     TrelloWire::STATUS_CHANGE_MOVE => $this->_('Move the card to a different list'),
                     TrelloWire::STATUS_CHANGE_ARCHIVE => $this->_('Archive the card'),
                     TrelloWire::STATUS_CHANGE_DELETE => $this->_('Delete the card (irreversibly)'),
                 ]);
-                $StatusChangeOptions->required = true;
-                $StatusChangeOptions->columnWidth = 34;
-                $StatusChangeOptions->collapsed = Inputfield::collapsedNever;
                 $StatusChanges->add($StatusChangeOptions);
 
-                $MoveListTarget = wire()->modules->get('InputfieldSelect');
-                $MoveListTarget->name = "MoveListTarget{$status}";
-                $MoveListTarget->label = $this->_('Select the list to move the card to');
-                $MoveListTarget->columnWidth = 33;
-                $MoveListTarget->collapsed = Inputfield::collapsedNever;
+                $MoveListTarget = $this->buildInputfield('InputfieldSelect', "MoveListTarget{$status}", $this->_('Select the list to move the card to'), 33);
                 if ($availableLists) {
                     $MoveListTarget->setOptions(array_combine(array_column($availableLists, 'id'), array_column($availableLists, 'name')));
                 } else {
@@ -263,12 +203,9 @@ class TrelloWireConfig extends ModuleConfig
                 $MoveListTarget->requiredIf(sprintf('%s=%s', $fieldName, TrelloWire::STATUS_CHANGE_MOVE));
                 $StatusChanges->add($MoveListTarget);
 
+                // deleted pages cannot be restored
                 if (!in_array($status, ['Deleted'])) {
-                    $RestoreOnReverse = wire()->modules->get('InputfieldCheckbox');
-                    $RestoreOnReverse->name = "RestoreOnReverse{$status}";
-                    $RestoreOnReverse->label = $StatusChangeLabels[$status]['restoreLabel'];
-                    $RestoreOnReverse->columnWidth = 33;
-                    $RestoreOnReverse->collapsed = Inputfield::collapsedNever;
+                    $RestoreOnReverse = $this->buildInputfield('InputfieldCheckbox', "RestoreOnReverse{$status}", $StatusChangeLabels[$status]['restoreLabel'], 33);
                     $RestoreOnReverse->showIf(sprintf('%s=%s', $fieldName, TrelloWire::STATUS_CHANGE_ARCHIVE));
                     $StatusChanges->add($RestoreOnReverse);
                 }
@@ -280,6 +217,47 @@ class TrelloWireConfig extends ModuleConfig
         }
 
         return $inputfields;
+    }
+
+    /**
+     * Build an Inputfield object. Pass null for any option to skip it.
+     *
+     * @param string $module            The inputfield module to use.
+     * @param string|null $name         The name of the input.
+     * @param string|null $label        The field label.
+     * @param integer|null $columnWidth The column width.
+     * @param integer|null $collapsed   The collapsed status (@see Inputfield).
+     * @param boolean|null $required    Is this field required?
+     * @return Inputfield
+     */
+    protected function buildInputfield(
+        string $module = 'InputfieldText',
+        ?string $name = null,
+        ?string $label = null,
+        ?int $columnWidth = 100,
+        ?int $collapsed = Inputfield::collapsedNever,
+        ?bool $required = null
+    ): Inputfield {
+        $inputfield = wire()->modules->get($module);
+        if ($name) $inputfield->name = $name;
+        if ($label) $inputfield->label = $label;
+        if (null !== $columnWidth) $inputfield->columnWidth = $columnWidth;
+        if (null !== $collapsed) $inputfield->collapsed = $collapsed;
+        if (null !== $required) $inputfield->required = $required;
+        return $inputfield;
+    }
+
+    /**
+     * Disable an inputfield by adding a disabled attribute and adding some styling.
+     *
+     * @param Inputfield $inputfield
+     * @return void
+     */
+    protected function disableField(Inputfield $inputfield): void
+    {
+        // @TODO: cleaner "disabled" status & styling
+        $inputfield->attr('disabled', 'disabled');
+        $inputfield->attr('style', 'background: #ccc; cursor: not-allowed;');
     }
 
     /**
@@ -297,19 +275,6 @@ class TrelloWireConfig extends ModuleConfig
             $displayName = $template->label ? "{$template->label} ({$template->name})" : $template->name;
             $inputfield->addOption($template->name, $displayName);
         }
-    }
-
-    /**
-     * Disable an inputfield by adding a disabled attribute and adding some styling.
-     *
-     * @param Inputfield $inputfield
-     * @return void
-     */
-    protected function disableField(Inputfield $inputfield): void
-    {
-        // @TODO: cleaner "disabled" status & styling
-        $inputfield->attr('disabled', 'disabled');
-        $inputfield->attr('style', 'background: #ccc; cursor: not-allowed;');
     }
 
     /**
