@@ -12,6 +12,7 @@ class TrelloWireConfig extends ModuleConfig
     public function getDefaults()
     {
         return [
+            'TrelloWireActive' => true,
             'ApiKey' => '',
             'ApiToken' => '',
             'TargetBoard' => '',
@@ -51,12 +52,18 @@ class TrelloWireConfig extends ModuleConfig
         $currentApiToken = $TrelloWire->ApiToken;
         $hasApiKey = !empty($currentApiKey);
         $hasApiToken = !empty($currentApiToken);
-        $hasInvalidToken = $hasApiKey && $hasApiToken ? !$TrelloWire->api()->isValidToken() : false;
+        $hasValidToken = $hasApiKey && $hasApiToken && $TrelloWire->api()->isValidToken();
+        $hasInvalidToken = $hasApiKey && $hasApiToken && !$hasValidToken;
 
-        $ApiKey = $this->buildInputfield('InputfieldText', 'ApiKey', $this->_('Trello API Key'), 50, Inputfield::collapsedNever, true);
+        $TrelloWireActive = $this->buildInputfield('InputfieldCheckbox', 'TrelloWireActive', $this->_('Trello Wire status'), 34);
+        $TrelloWireActive->label2 = $this->_('Activate module?');
+        $TrelloWireActive->description = $this->_('Uncheck this to suspend all automatic operations that this module performs.');
+        $TrelloWireActive->notes = $this->_('Use this switch if you want to temporarily disable the module without deleting your settings.');
+
+        $ApiKey = $this->buildInputfield('InputfieldText', 'ApiKey', $this->_('Trello API Key'), 33, Inputfield::collapsedNever, true);
         $ApiKey->description = sprintf($this->_('You can [generate your API key here](%s).'), 'https://trello.com/app-key');
 
-        $ApiToken = $this->buildInputfield('InputfieldText', 'ApiToken', $this->_('Trello API Token'), 50, Inputfield::collapsedNever, $hasApiKey);
+        $ApiToken = $this->buildInputfield('InputfieldText', 'ApiToken', $this->_('Trello API Token'), 33, Inputfield::collapsedNever, $hasApiKey);
         $tokenFieldDescription = $hasApiKey
             ? $this->_('[Generate your access token using this link](%s).')
             : $this->_('Please set your API key first.');
@@ -75,22 +82,42 @@ class TrelloWireConfig extends ModuleConfig
         if ($hasInvalidToken) {
             $ApiToken->error($this->_('The API token is invalid! It may have been deleted, expired or been revoked.'));
         }
-        if ($hasApiToken && !$hasInvalidToken) {
+        if ($hasValidToken) {
             $ApiToken->notes($this->_('SUCCESS: API token apears to be working!'));
         }
 
+        $TrelloTargetSettings = wire()->modules->get('InputfieldFieldset');
+        $TrelloTargetSettings->label = $this->_('Trello settings for new cards');
+        $TrelloTargetSettings->collapsed = Inputfield::collapsedNo;
+
+        $CardSyncSettings = wire()->modules->get('InputfieldFieldset');
+        $CardSyncSettings->label = $this->_('Card creation and update settings');
+        $CardSyncSettings->collapsed = Inputfield::collapsedNo;
+
+        $StatusChanges = wire()->modules->get('InputfieldFieldset');
+        $StatusChanges->label = $this->_('Status change handling');
+        $StatusChanges->collapsed = Inputfield::collapsedNo;
+
+        $inputfields->add($TrelloWireActive);
         $inputfields->add($ApiKey);
         $inputfields->add($ApiToken);
 
+        $inputfields->add($TrelloTargetSettings);
+        $inputfields->add($CardSyncSettings);
+        $inputfields->add($StatusChanges);
+
+        if (!$hasValidToken) {
+            $settingsInactiveText = $this->_('Those settings will become available once you have set a valid API key & token.');
+            $TrelloTargetSettings->description = $settingsInactiveText;
+            $CardSyncSettings->description = $settingsInactiveText;
+            $StatusChanges->description = $settingsInactiveText;
+        }
+
         // @TODO: Add usage notes / descriptions to all fields
-        if ($hasApiKey && $hasApiToken && !$hasInvalidToken) {
+        if ($hasValidToken) {
             $TrelloWireApi = $TrelloWire->api();
 
-            try {
-                $availableLists = $TrelloWire->TargetBoard ? $TrelloWireApi->lists($TrelloWire->TargetBoard) : null;
-            } catch (Throwable $e) {
-                $availableLists = null;
-            }
+            $availableLists = $TrelloWire->TargetBoard ? $TrelloWireApi->lists($TrelloWire->TargetBoard) : null;
 
             $TargetBoard = $this->buildInputfield('InputfieldSelect', 'TargetBoard', $this->_('Trello target board'), 50, Inputfield::collapsedNever, true);
             $TargetBoard->description = $this->_('Select the default Trello board to add new cards to.');
@@ -147,9 +174,6 @@ class TrelloWireConfig extends ModuleConfig
             $CardChecklistTitle = $this->buildInputfield('InputfieldText', 'CardChecklistTitle', $this->_('Card checklist title'), 33);
             $CardChecklistTitle->showIf("CardChecklistItems!=''");
 
-            $TrelloTargetSettings = wire()->modules->get('InputfieldFieldset');
-            $TrelloTargetSettings->label = $this->_('Trello settings for new cards');
-            $TrelloTargetSettings->collapsed = Inputfield::collapsedNo;
             $TrelloTargetSettings->add($TargetBoard);
             $TrelloTargetSettings->add($TargetList);
             $TrelloTargetSettings->add($TrelloWireTemplates);
@@ -170,15 +194,8 @@ class TrelloWireConfig extends ModuleConfig
             $CardUpdate->label2 = $this->_('Update Trello cards when pages are updated');
             $CardUpdate->description = $this->_('When a page with a reference to a card is saved, update the card on Trello?');
 
-            $CardSyncSettings = wire()->modules->get('InputfieldFieldset');
-            $CardSyncSettings->label = $this->_('Card creation and update settings');
-            $CardSyncSettings->collapsed = Inputfield::collapsedNo;
             $CardSyncSettings->add($CardCreationTrigger);
             $CardSyncSettings->add($CardUpdate);
-
-            $StatusChanges = wire()->modules->get('InputfieldFieldset');
-            $StatusChanges->label = $this->_('Status change handling');
-            $StatusChanges->collapsed = Inputfield::collapsedNo;
 
             $StatusChangeLabels = $this->statusChangeFieldLabels();
             foreach (['Hidden', 'Unpublished', 'Trashed', 'Deleted'] as $status) {
@@ -210,10 +227,6 @@ class TrelloWireConfig extends ModuleConfig
                     $StatusChanges->add($RestoreOnReverse);
                 }
             }
-
-            $inputfields->add($TrelloTargetSettings);
-            $inputfields->add($CardSyncSettings);
-            $inputfields->add($StatusChanges);
         }
 
         return $inputfields;

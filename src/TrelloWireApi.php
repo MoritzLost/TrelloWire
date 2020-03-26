@@ -81,7 +81,8 @@ class TrelloWireApi extends Wire
     /**
      * Send a request to any endpoint of the Trello API. This passes requests to
      * the appropriate method of ProcessWire's WireHttp class, so check the
-     * documentation for possible return values.
+     * documentation for possible return values. You can always access the WireHttp
+     * instance used for the last request through the public $lastRequest property.
      *
      * @param string $endpoint  The endpoint to call, including relevant parameters, without a leading slash.
      * @param string $method    The HTTP method to use (one of GET, POST, PUT, DELETE).
@@ -105,10 +106,20 @@ class TrelloWireApi extends Wire
                 return $WireHttp->post($url, $data);
             case 'PUT':
             case 'DELETE':
-                return $WireHttp->send($url, $data, $method);
             default:
-                throw new \InvalidArgumentException(sprintf($this->_('Invalid HTTP requested method: %s'), $method));
+                return $WireHttp->send($url, $data, $method);
         }
+    }
+
+    /**
+     * Check if an HTTP response code is in the OK range (2XX).
+     *
+     * @param integer $httpCode
+     * @return boolean
+     */
+    public function isResponseCodeOk(int $httpCode): bool
+    {
+        return $httpCode >= 200 && $httpCode < 300;
     }
 
     /**
@@ -119,8 +130,7 @@ class TrelloWireApi extends Wire
     public function isValidToken(): bool
     {
         $this->get(sprintf('tokens/%s?fields=dateExpires&webhooks=false', $this->ApiToken));
-        $httpResponseCode = $this->lastRequest->getHttpCode();
-        return $httpResponseCode >= 200 & $httpResponseCode < 300;
+        return $this->isResponseCodeOk($this->lastRequest->getHttpCode());
     }
 
     /**
@@ -128,34 +138,35 @@ class TrelloWireApi extends Wire
      * 
      * @param array $fields     Board fields to include in the response.
      * @param string $filter    The filter to use for this request.
-     * @return array
+     * @return array|bool       Returns an array of board objects or false on failure.
      */
-    public function boards(array $fields = ['id', 'name'], string $filter = 'all'): array
+    public function boards(array $fields = ['id', 'name'], string $filter = 'all')
     {
         $result = $this->get(sprintf(
             'members/me/boards?fields=%1$s&filter=%2$s',
             implode(',', $fields),
             $filter
         ));
-        $responseCode = $this->lastRequest->getHttpCode();
-        if (!$this->isResponseCodeOk($responseCode)) {
-            throw new \InvalidArgumentException(sprintf($this->_('Error retrieving Trello boards. HTTP Code: %d'), $responseCode));
-        }
-        return json_decode($result);
+        return $this->isResponseCodeOk($this->lastRequest->getHttpCode()) ? json_decode($result) : false;
     }
 
     /**
-     * Get the lists in a board.
+     * Get the lists existing in a board.
      *
      * @param string $idBoard   The ID of the board.
      * @param array $fields     The board fields to include in the response.
      * @param string $filter    The filter to use for this request.
      * @param string $cards     The type of cards to include in the response.
      * @param array $cardFields The card fields to include in the response.
-     * @return array
+     * @return array|boolean    Returns an array of list objects or false on failure.
      */
-    public function lists(string $idBoard, array $fields = ['id', 'name', 'pos'], string $filter = 'open', string $cards = 'none', array $cardFields = []): array
-    {
+    public function lists(
+        string $idBoard,
+        array $fields = ['id', 'name', 'pos'],
+        string $filter = 'open',
+        string $cards = 'none',
+        array $cardFields = []
+    ) {
         $result = $this->get(sprintf(
             'boards/%1$s/lists?fields=%2$s&filter=%3$s&cards=%4$s&card_fields=%5$s',
             $idBoard,
@@ -164,19 +175,26 @@ class TrelloWireApi extends Wire
             $cards,
             implode(',', $cardFields)
         ));
+        return $this->isResponseCodeOk($this->lastRequest->getHttpCode()) ? json_decode($result) : false;
+    }
+
+    /**
+     * Get the available labels of a board.
+     *
+     * @param string $idBoard   The ID of the board.
+     * @param array $fields     The label fields to include in the response.
+     * @return array|boolean
+     */
+    public function labels(string $idBoard, array $fields = ['id', 'name', 'color'])
+    {
+        $result = $this->get(sprintf(
+            'boards/%1$s/labels?fields=%2$s',
+            $idBoard,
+            implode(',', $fields)
+        ));
         if (!$this->isResponseCodeOk($this->lastRequest->getHttpCode())) {
             throw new \InvalidArgumentException(sprintf($this->_('Board with ID %s does not appear to exist.'), $idBoard));
         }
-        return json_decode($result);
-    }
-
-    public function labels(string $idBoard): array
-    {
-        $result = $this->get(sprintf(
-            'boards/%1$s/labels',
-            $idBoard
-        ));
-        // @TODO: check response code, throw on error
         return json_decode($result);
     }
 
@@ -186,10 +204,10 @@ class TrelloWireApi extends Wire
      * @param string $idList    The ID of the list to add the card to.
      * @param string $title     The name / title of the card.
      * @param string $body      The description / body of the card.
-     * @param array $addData    Additional fields to pass to the API.
-     * @return boolean
+     * @param array $addData    Additional fields to pass to the API (associative array).
+     * @return object|boolean   Returns the card object on success or false on failure.
      */
-    public function postCard(string $idList, string $title, string $body = '', array $addData = [])
+    public function createCard(string $idList, string $title, string $body = '', array $addData = [])
     {
         $result = $this->post('cards', array_merge(
             $addData,
@@ -202,16 +220,78 @@ class TrelloWireApi extends Wire
         return $this->isResponseCodeOk($this->lastRequest->getHttpCode()) ? json_decode($result) : false;
     }
 
-    public function updateCard(string $id, ?string $title = null, ?string $body = null, array $addData = [])
+    /**
+     * Update an existing card on Trello.
+     *
+     * @param string $idCard        The ID of the card.
+     * @param string|null $title    New title / name for the card. Pass null to leave the existing title.
+     * @param string|null $body     New body / description for the card. Pass null to leave the existing body.
+     * @param array $addData        Additional fields to update (associative array).
+     * @return object|bool          Returns the card object on success or false on failure.
+     */
+    public function updateCard(string $idCard, ?string $title = null, ?string $body = null, array $addData = [])
     {
         $updateFields = array_merge($addData, array_filter([
             'name' => $title,
             'desc' => $body,
         ]));
-        $result = $this->put(sprintf('cards/%s', $id), $updateFields);
+        $result = $this->put(sprintf('cards/%s', $idCard), $updateFields);
         return $this->isResponseCodeOk($this->lastRequest->getHttpCode()) ? json_decode($result) : false;
     }
 
+    /**
+     * Move a card to a different list.
+     *
+     * @param string $idCard    The ID of the card to move.
+     * @param string $idList    The ID of the list to move the card to.
+     * @return object|bool      Returns the card object on success or false on failure.
+     */
+    public function moveCard(string $idCard, string $idList)
+    {
+        return $this->updateCard($idCard, null, null, ['idList' => $idList]);
+    }
+
+    /**
+     * Archive / close a card.
+     *
+     * @param string $idCard    The ID of the card to close.
+     * @return object|bool      Returns the card object on success or false on failure.
+     */
+    public function archiveCard(string $idCard)
+    {
+        return $this->updateCard($idCard, null, null, ['closed' => true]);
+    }
+
+    /**
+     * Restore / open a card.
+     *
+     * @param string $idCard    The ID of the card to restore.
+     * @return object|bool      Returns the card object on success or false on failure.
+     */
+    public function restoreCard(string $idCard)
+    {
+        return $this->updateCard($idCard, null, null, ['closed' => false]);
+    }
+
+    /**
+     * Permanently delete a card. Cards deleted this way can NOT be restored!
+     *
+     * @param string $idCard    The ID of the card to delete.
+     * @return boolean          Returns true on success or false on failure.
+     */
+    public function deleteCard(string $idCard): bool
+    {
+        $this->delete(sprintf('cards/%s', $idCard));
+        return $this->isResponseCodeOk($this->lastRequest->getHttpCode());
+    }
+
+    /**
+     * Add a new checklist to a card.
+     *
+     * @param string $idCard    The ID of the card.
+     * @param string $title     The title of the checklist.
+     * @return object|bool      Returns the checklist object on success or false on failure.
+     */
     public function addChecklistToCard(string $idCard, string $title)
     {
         $result = $this->post('checklists', [
@@ -221,24 +301,22 @@ class TrelloWireApi extends Wire
         return $this->isResponseCodeOk($this->lastRequest->getHttpCode()) ? json_decode($result) : false;
     }
 
-    public function addItemToChecklist(string $idChecklist, string $title, bool $checked = false, $position = 'bottom')
+    /**
+     * Add an item to a checklist.
+     *
+     * @param string $idChecklist   The ID of the checklist.
+     * @param string $title         The title / name of the new item.
+     * @param boolean $checked      Is the new item checked?
+     * @param string $position      Position of the new item ('top', 'bottom', or positive integer).
+     * @return boolean              Returns true on success or false on failure.
+     */
+    public function addItemToChecklist(string $idChecklist, string $title, bool $checked = false, $position = 'bottom'): boolean
     {
-        $result = $this->post(sprintf('checklists/%s/checkItems', $idChecklist), [
+        $this->post(sprintf('checklists/%s/checkItems', $idChecklist), [
             'name' => $title,
             'checked' => $checked,
             'pos' => $position
         ]);
         return $this->isResponseCodeOk($this->lastRequest->getHttpCode()) ? true : false;
-    }
-
-    /**
-     * Check if an HTTP response code is in the OK range (2XX).
-     *
-     * @param integer $httpCode
-     * @return boolean
-     */
-    public function isResponseCodeOk(int $httpCode): bool
-    {
-        return $httpCode >= 200 && $httpCode < 300;
     }
 }

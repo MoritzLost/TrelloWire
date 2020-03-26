@@ -52,8 +52,7 @@ class TrelloWire extends Wire implements Module
 
     public function init()
     {
-        // @TODO: global switch to turn off all automatic module operations
-        if ($this->ApiKey && $this->ApiToken) {
+        if ($this->TrelloWireActive && $this->ApiKey && $this->ApiToken) {
             // hook after a page is saved, this will handle all card & status updates
             $this->addHookAfter('Pages::saved', $this, 'pageSavedHook');
             // special case: create cards as soon as a page is added, this can't
@@ -61,7 +60,9 @@ class TrelloWire extends Wire implements Module
             if ($this->CardCreationTrigger === self::CREATE_ON_ADDED) {
                 $this->addHookAfter('Pages::added', $this, 'pageAddedHook');
             }
-            // @TODO: DELETED hook & functionality
+            if ($this->StatusChangeDeleted !== self::STATUS_CHANGE_NO_ACTION) {
+                $this->addHookAfter('Pages::deleteReady', $this, 'pageDeleteReadyHook');
+            }
         }
     }
 
@@ -119,21 +120,22 @@ class TrelloWire extends Wire implements Module
             }
         }
 
+        // perform selected actions after status changes
         foreach (['Hidden' => $wasHidden, 'Unpublished' => $wasUnpublished, 'Trashed' => $wasTrashed] as $change => $wasChanged) {
             if (!$wasChanged) continue;
             $actionSettingKey = "StatusChange{$change}";
             switch ($this->{$actionSettingKey}) {
                 case self::STATUS_CHANGE_ARCHIVE:
-                    // @TODO: archive card on trello
+                    $this->api()->archiveCard($card->id);
                     break;
                 case self::STATUS_CHANGE_DELETE:
-                    // @TODO: delete card on trello
+                    $this->api()->deleteCard($card->id);
                     break;
                 case self::STATUS_CHANGE_MOVE:
                     $targetSettingKey = "MoveListTarget{$change}";
                     $targetListId = $this->{$targetSettingKey};
                     if ($targetListId) {
-                        // @TODO: move card to target list on trello
+                        $this->api()->moveCard($card->id, $targetListId);
                     }
                     break;
                 case self::STATUS_CHANGE_NO_ACTION:
@@ -142,12 +144,13 @@ class TrelloWire extends Wire implements Module
             }
         }
 
+        // restore archived cards after status changes were reverted, if that setting is active
         foreach (['Hidden' => $wasUnhidden, 'Unpublished' => $wasPublished, 'Trashed' => $wasRestored] as $change => $wasChanged) {
             if (!$wasChanged) continue;
             $restoreActionSettingKey = "RestoreOnReverse{$change}";
-            $restoreAction = $this->{$restoreActionSettingKey};
-            if (!$restoreAction) continue;
-            // @TODO: restore archived card on trello
+            $restoreCard = $this->{$restoreActionSettingKey};
+            if (!$restoreCard) continue;
+            $this->api()->restoreCard($card->id);
         }
     }
 
@@ -158,9 +161,23 @@ class TrelloWire extends Wire implements Module
         $this->createCardForPage($this->buildCardData($page), $page);
     }
 
-    public function pageDeletedHook(HookEvent $e): void
+    public function pageDeleteReadyHook(HookEvent $e): void
     {
-        // @TODO: handle page deletion option
+        $page = $e->arguments(0);
+        if (!in_array($page->template->name, $this->TrelloWireTemplates)) return;
+        $card = $this->buildCardData($page);
+        if (!$card->id) return;
+        switch ($this->StatusChangeDeleted) {
+            case self::STATUS_CHANGE_ARCHIVE:
+                $this->api()->archiveCard($card->id);
+            case self::STATUS_CHANGE_MOVE:
+                $this->api()->deleteCard($card->id);
+            case self::STATUS_CHANGE_MOVE:
+                $targetListId = $this->MoveListTarget;
+                if ($targetListId) {
+                    $this->api()->moveCard($card->id, $targetListId);
+                }
+        }
     }
 
     /**
@@ -178,7 +195,7 @@ class TrelloWire extends Wire implements Module
        $titleField = !empty($this->CardTitle) ? $this->CardTitle : $defaultSettings['CardTitle'];
        $TrelloWireCard->setTitle($page->getText($titleField, true, false));
        if (!empty($this->CardBody)) {
-           $TrelloWireCard->setBody($page->getMarkup($this->CardBody));
+           $TrelloWireCard->setBody($page->getText($this->CardBody, false, false));
        }
        // for existing cards (card id stored in page settings), restore the id
        $existingCardId = $page->meta(self::CARD_REFERENCE_KEY);
@@ -213,8 +230,10 @@ class TrelloWire extends Wire implements Module
         if (!empty($checklistItems)) {
             $checklistTitle = $this->getDefaultChecklistTitle();
             $checklist = $this->api()->addChecklistToCard($response->id, $checklistTitle);
-            foreach ($checklistItems as $item) {
-                $this->api()->addItemToChecklist($checklist->id, $item);
+            if ($checklist && $checklist->id) {
+                foreach ($checklistItems as $item) {
+                    $this->api()->addItemToChecklist($checklist->id, $item);
+                }
             }
         }
     }
@@ -255,7 +274,7 @@ class TrelloWire extends Wire implements Module
     {
         if (!$card->list) return false;
         if (!$api = $this->api()) return null;
-        return $api->postCard($card->list, $card->title, $card->body, array_filter([
+        return $api->createCard($card->list, $card->title, $card->body, array_filter([
             'idLabels' => $card->labels ? implode(',', $card->labels) : null,
         ]));
     }
