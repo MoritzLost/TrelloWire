@@ -4,8 +4,6 @@ namespace Processwire;
 use ProcessWire\Inputfield;
 use ProcessWire\InputfieldAsmSelect;
 use ProcessWire\TrelloWire;
-use ProcessWire\TrelloWireApi;
-use Throwable;
 
 class TrelloWireConfig extends ModuleConfig
 {
@@ -19,12 +17,12 @@ class TrelloWireConfig extends ModuleConfig
             'TargetList' => '',
             'TrelloWireTemplates' => [],
             'CardTitle' => '{title}',
-            'CardBody' => '',
+            'CardBody' => '{httpUrl}',
             'CardLabels' => [],
             'CardChecklistItems' => '',
             'CardChecklistTitle' => 'Checklist',
             'CardCreationTrigger' => TrelloWire::CREATE_ON_PUBLISHED,
-            'CardUpdate' => true,
+            'CardUpdate' => false,
 
             'StatusChangeHidden' => TrelloWire::STATUS_CHANGE_NO_ACTION,
             'MoveListTargetHidden' => '',
@@ -38,7 +36,7 @@ class TrelloWireConfig extends ModuleConfig
             'MoveListTargetTrashed' => '',
             'RestoreOnReverseTrashed' => true,
 
-            'StatusChangeDeleted' => TrelloWire::STATUS_CHANGE_DELETE,
+            'StatusChangeDeleted' => TrelloWire::STATUS_CHANGE_ARCHIVE,
             'MoveListTargetDeleted' => '',
         ];
     }
@@ -152,7 +150,7 @@ class TrelloWireConfig extends ModuleConfig
 
             $CardBody = $this->buildInputfield('InputfieldTextarea', 'CardBody', $this->_('Body / description for new cards'), 33);
             $CardBody->description = $this->_('This is passed through [wirePopulateStringTags](https://processwire.com/api/ref/functions/wire-populate-string-tags/), so you can include page field values with curly braces.');
-            $CardBody->notes = $this->_('Of course, you can also use a static text without field replacements.');
+            $CardBody->notes = $this->_('Note that the body / description text does not support HTML, but you can use Markdown.');
 
             $CardLabels = $this->buildInputfield('InputfieldCheckboxes', 'CardLabels', $this->_('Card labels'), 34);
             $availableLabels = $TrelloWire->TargetBoard ? $TrelloWireApi->labels($TrelloWire->TargetBoard) : null;

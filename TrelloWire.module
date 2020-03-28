@@ -54,7 +54,6 @@ class TrelloWire extends Wire implements Module
      */
     public function __construct()
     {
-        // add namespace to autoload module classes
         $namespace = 'ProcessWire\\TrelloWire';
         $classLoader = $this->wire('classLoader');
         if (!$classLoader->hasNamespace($namespace)) {

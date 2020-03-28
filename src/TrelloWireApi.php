@@ -37,6 +37,44 @@ class TrelloWireApi extends Wire
     }
 
     /**
+     * Send a request to any endpoint of the Trello API. This passes requests to
+     * the appropriate method of ProcessWire's WireHttp class, so check the
+     * documentation for possible return values. You can always access the WireHttp
+     * instance used for the last request through the public $lastRequest property.
+     *
+     * @param string $endpoint  The endpoint to call, including relevant parameters, without a leading slash.
+     * @param string $method    The HTTP method to use (one of GET, POST, PUT, DELETE).
+     * @param array $data       Additional data to send with this request.
+     * @see https://processwire.com/api/ref/wire-http/
+     * @return mixed
+     */
+    public function send(string $endpoint, string $method = 'GET', array $data = [])
+    {
+        $WireHttp = new WireHttp();
+        $this->lastRequest = $WireHttp;
+        $url = self::API_BASE . ltrim($endpoint, '/');
+        $data = array_merge(
+            ['key' => $this->ApiKey, 'token' => $this->ApiToken],
+            $data
+        );
+        switch ($method) {
+            case 'GET':
+                $result = $WireHttp->get($url, $data);
+                break;
+            case 'POST';
+                $result = $WireHttp->post($url, $data);
+                break;
+            case 'PUT':
+            case 'DELETE':
+            default:
+                $result = $WireHttp->send($url, $data, $method);
+        }
+        $this->lastResponseCode = $WireHttp->getHttpCode();
+        $this->lastResponseOk = $this->isResponseCodeOk($this->lastResponseCode);
+        return $result;
+    }
+
+    /**
      * Send a GET request to the specified endpoint of the Trello API.
      *
      * @param string $endpoint  The endpoint to call, including relevant parameters, without a leading slash.
@@ -82,42 +120,6 @@ class TrelloWireApi extends Wire
     public function delete(string $endpoint, array $data = [])
     {
         return $this->send($endpoint, 'DELETE', $data);
-    }
-
-    /**
-     * Send a request to any endpoint of the Trello API. This passes requests to
-     * the appropriate method of ProcessWire's WireHttp class, so check the
-     * documentation for possible return values. You can always access the WireHttp
-     * instance used for the last request through the public $lastRequest property.
-     *
-     * @param string $endpoint  The endpoint to call, including relevant parameters, without a leading slash.
-     * @param string $method    The HTTP method to use (one of GET, POST, PUT, DELETE).
-     * @param array $data       Additional data to send with this request.
-     * @see https://processwire.com/api/ref/wire-http/
-     * @return mixed
-     */
-    public function send(string $endpoint, string $method = 'GET', array $data = [])
-    {
-        $WireHttp = new WireHttp();
-        $this->lastRequest = $WireHttp;
-        $url = self::API_BASE . ltrim($endpoint, '/');
-        $data = array_merge(
-            ['key' => $this->ApiKey, 'token' => $this->ApiToken],
-            $data
-        );
-        switch ($method) {
-            case 'GET':
-                $result = $WireHttp->get($url, $data);
-            case 'POST';
-                $result = $WireHttp->post($url, $data);
-            case 'PUT':
-            case 'DELETE':
-            default:
-                $result = $WireHttp->send($url, $data, $method);
-        }
-        $this->lastResponseCode = (int) $WireHttp->getHttpCode();
-        $this->lastResponseOk = $this->isResponseCodeOk($this->lastResponseCode);
-        return $result;
     }
 
     /**
@@ -316,13 +318,13 @@ class TrelloWireApi extends Wire
      * @param string $position      Position of the new item ('top', 'bottom', or positive integer).
      * @return boolean              Returns true on success or false on failure.
      */
-    public function addItemToChecklist(string $idChecklist, string $title, bool $checked = false, $position = 'bottom'): boolean
+    public function addItemToChecklist(string $idChecklist, string $title, bool $checked = false, $position = 'bottom'): bool
     {
         $this->post(sprintf('checklists/%s/checkItems', $idChecklist), [
             'name' => $title,
             'checked' => $checked,
             'pos' => $position
         ]);
-        return $this->isResponseCodeOk($this->lastRequest->getHttpCode()) ? true : false;
+        return $this->lastResponseOk ? true : false;
     }
 }
