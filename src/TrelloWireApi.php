@@ -9,8 +9,14 @@ class TrelloWireApi extends Wire
     /** @var string The base URL for the Trello API. */
     public const API_BASE = 'https://api.trello.com/1/';
 
-    /** @var WireHttp Always contains the WireHttp instance used for the last request made through this object. */
+    /** @var WireHttp Always contains the WireHttp instance used for the last request made through this instance. */
     public $lastRequest;
+
+    /** @var int Always contains the HTTP response code of the last request made through this instance. */
+    public $lastResponseCode;
+
+    /** @var bool Always contains true if the last request made through this instance was successful (status code 2XX) or false if it wasn't. */
+    public $lastResponseOk;
 
     /** @var string The API key for Trello. */
     protected $ApiKey;
@@ -101,14 +107,17 @@ class TrelloWireApi extends Wire
         );
         switch ($method) {
             case 'GET':
-                return $WireHttp->get($url, $data);
+                $result = $WireHttp->get($url, $data);
             case 'POST';
-                return $WireHttp->post($url, $data);
+                $result = $WireHttp->post($url, $data);
             case 'PUT':
             case 'DELETE':
             default:
-                return $WireHttp->send($url, $data, $method);
+                $result = $WireHttp->send($url, $data, $method);
         }
+        $this->lastResponseCode = (int) $WireHttp->getHttpCode();
+        $this->lastResponseOk = $this->isResponseCodeOk($this->lastResponseCode);
+        return $result;
     }
 
     /**
@@ -130,7 +139,7 @@ class TrelloWireApi extends Wire
     public function isValidToken(): bool
     {
         $this->get(sprintf('tokens/%s?fields=dateExpires&webhooks=false', $this->ApiToken));
-        return $this->isResponseCodeOk($this->lastRequest->getHttpCode());
+        return $this->lastResponseOk;
     }
 
     /**
@@ -147,7 +156,7 @@ class TrelloWireApi extends Wire
             implode(',', $fields),
             $filter
         ));
-        return $this->isResponseCodeOk($this->lastRequest->getHttpCode()) ? json_decode($result) : false;
+        return $this->lastResponseOk ? json_decode($result) : false;
     }
 
     /**
@@ -175,7 +184,7 @@ class TrelloWireApi extends Wire
             $cards,
             implode(',', $cardFields)
         ));
-        return $this->isResponseCodeOk($this->lastRequest->getHttpCode()) ? json_decode($result) : false;
+        return $this->lastResponseOk ? json_decode($result) : false;
     }
 
     /**
@@ -192,10 +201,7 @@ class TrelloWireApi extends Wire
             $idBoard,
             implode(',', $fields)
         ));
-        if (!$this->isResponseCodeOk($this->lastRequest->getHttpCode())) {
-            throw new \InvalidArgumentException(sprintf($this->_('Board with ID %s does not appear to exist.'), $idBoard));
-        }
-        return json_decode($result);
+        return $this->lastResponseOk ? json_decode($result) : false;
     }
 
     /**
@@ -217,7 +223,7 @@ class TrelloWireApi extends Wire
                 'idList' => $idList
             ]
         ));
-        return $this->isResponseCodeOk($this->lastRequest->getHttpCode()) ? json_decode($result) : false;
+        return $this->lastResponseOk ? json_decode($result) : false;
     }
 
     /**
@@ -236,7 +242,7 @@ class TrelloWireApi extends Wire
             'desc' => $body,
         ]));
         $result = $this->put(sprintf('cards/%s', $idCard), $updateFields);
-        return $this->isResponseCodeOk($this->lastRequest->getHttpCode()) ? json_decode($result) : false;
+        return $this->lastResponseOk ? json_decode($result) : false;
     }
 
     /**
@@ -282,7 +288,7 @@ class TrelloWireApi extends Wire
     public function deleteCard(string $idCard): bool
     {
         $this->delete(sprintf('cards/%s', $idCard));
-        return $this->isResponseCodeOk($this->lastRequest->getHttpCode());
+        return $this->lastResponseOk;
     }
 
     /**
@@ -298,7 +304,7 @@ class TrelloWireApi extends Wire
             'idCard' => $idCard,
             'name' => $title,
         ]);
-        return $this->isResponseCodeOk($this->lastRequest->getHttpCode()) ? json_decode($result) : false;
+        return $this->lastResponseOk ? json_decode($result) : false;
     }
 
     /**

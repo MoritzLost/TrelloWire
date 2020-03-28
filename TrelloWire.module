@@ -5,19 +5,29 @@ use ProcessWire\TrelloWire\TrelloWireApi;
 
 class TrelloWire extends Wire implements Module
 {
-    public const CARD_REFERENCE_KEY = 'TrelloWireCardId';
+    /** Parameters for the Trello API token request. */
+    public const TRELLO_API_PERMISSIONS = ['read', 'write'];
+    public const TRELLO_API_APP_NAME = 'TrelloWire';
+    public const TRELLO_API_TOKEN_EXPIRATION = 'never';
 
+    /** Setting values for card creation options. */
     public const CREATE_NEVER = 'never';
     public const CREATE_ON_ADDED = 'added';
     public const CREATE_ON_PUBLISHED = 'published';
 
+    /** Setting values for status change handling options. */
     public const STATUS_CHANGE_NO_ACTION = 'nothing';
     public const STATUS_CHANGE_MOVE = 'move';
     public const STATUS_CHANGE_ARCHIVE = 'archive';
     public const STATUS_CHANGE_DELETE = 'delete';
 
+    /** @var string The key used to store the reference to the Trello card inside a page's meta data. */
+    public const CARD_REFERENCE_KEY = 'TrelloWireCardId';
+
+    /** @var string The name of the system log used by this module. */
     public const LOG_NAME = 'trello-wire';
 
+    /** @var TrelloWireApi Stored TrelloWireApi instance. */
     protected $api;
 
     public static function getModuleInfo()
@@ -39,6 +49,9 @@ class TrelloWire extends Wire implements Module
         ];
     }
 
+    /**
+     * The constructor registers the TrelloWire namespace used by this module.
+     */
     public function __construct()
     {
         // add namespace to autoload module classes
@@ -50,8 +63,12 @@ class TrelloWire extends Wire implements Module
         }
     }
 
+    /**
+     * Called during initialization, registers hooks to react to page changes.
+     */
     public function init()
     {
+        // only add the hooks if the module is toggled active and both API key & token are set
         if ($this->TrelloWireActive && $this->ApiKey && $this->ApiToken) {
             // hook after a page is saved, this will handle all card & status updates
             $this->addHookAfter('Pages::saved', $this, 'pageSavedHook');
@@ -60,6 +77,7 @@ class TrelloWire extends Wire implements Module
             if ($this->CardCreationTrigger === self::CREATE_ON_ADDED) {
                 $this->addHookAfter('Pages::added', $this, 'pageAddedHook');
             }
+            // special case: handle page deletion
             if ($this->StatusChangeDeleted !== self::STATUS_CHANGE_NO_ACTION) {
                 $this->addHookAfter('Pages::deleteReady', $this, 'pageDeleteReadyHook');
             }
@@ -68,7 +86,8 @@ class TrelloWire extends Wire implements Module
 
     /**
      * Get an instance of the TrelloWireApi class using the API key and token
-     * set through the module configuration.
+     * set through the module configuration. This will return null if the API
+     * key or token are missing.
      *
      * @return TrelloWireApi|null
      */
@@ -87,7 +106,6 @@ class TrelloWire extends Wire implements Module
     {
         $page = $e->arguments(0);
         if (!in_array($page->template->name, $this->TrelloWireTemplates)) return;
-        // @TODO: check if the API key is valid ...
         $card = $this->buildCardData($page);
         $isExistingCard = !empty($card->id);
         // find all status changes
@@ -120,7 +138,7 @@ class TrelloWire extends Wire implements Module
             }
         }
 
-        // perform selected actions after status changes
+        // perform the selected action after status changes
         foreach (['Hidden' => $wasHidden, 'Unpublished' => $wasUnpublished, 'Trashed' => $wasTrashed] as $change => $wasChanged) {
             if (!$wasChanged) continue;
             $actionSettingKey = "StatusChange{$change}";
@@ -158,6 +176,8 @@ class TrelloWire extends Wire implements Module
     {
         $page = $e->arguments(0);
         if (!in_array($page->template->name, $this->TrelloWireTemplates)) return;
+        // this hook is only added during initialization if the module is set
+        // to create card upon adding pages, so we don't need to check this again
         $this->createCardForPage($this->buildCardData($page), $page);
     }
 
@@ -182,20 +202,21 @@ class TrelloWire extends Wire implements Module
 
     /**
     * Construct a new TrelloWireCard instance based on the passed page using the
-    * module settings.
+    * module settings. Hook this if you want to change how Trello card data is
+    * generated for pages.
     *
     * @param Page $page        The page this card will belong to.
     * @return TrelloWireCard   The card object with values based on the page.
     */
    public function ___buildCardData(Page $page): TrelloWireCard
    {
+       $defaultSettings = (new TrelloWireConfig())->getDefaults();
        $TrelloWireCard = $this->modules->get('TrelloWireCard');
        $TrelloWireCard->setList($this->TargetList);
-       $defaultSettings = (new TrelloWireConfig())->getDefaults();
        $titleField = !empty($this->CardTitle) ? $this->CardTitle : $defaultSettings['CardTitle'];
-       $TrelloWireCard->setTitle($page->getText($titleField, true, false));
+       $TrelloWireCard->setTitle(wirePopulateStringTags($titleField, $page));
        if (!empty($this->CardBody)) {
-           $TrelloWireCard->setBody($page->getText($this->CardBody, false, false));
+           $TrelloWireCard->setBody(wirePopulateStringTags($this->CardBody, $page));
        }
        // for existing cards (card id stored in page settings), restore the id
        $existingCardId = $page->meta(self::CARD_REFERENCE_KEY);
@@ -209,12 +230,16 @@ class TrelloWire extends Wire implements Module
    }
 
    /**
-    * Create a card for a page. This automatically extract relevant data from the
-    * page based on the current settings and create the card on trello through the
-    * API. It also creates the default checklist defined through the settings.
+    * Creates a card on Trello based on the data contained in the passed
+    * TrelloWireCard. It also creates a new checklist on this card based on the
+    * module settings (Checklist title & items). Those settings are retrieved
+    * through the corresponding helper methods so you can modify or remove
+    * them by hooking those methods.
+    * After the card is created, the module will also store it's ID in the meta
+    * data of the passed $page, so it can be updated later.
     *
-    * @param Page $page
-    * @param TrelloWireCard $card
+    * @param TrelloWireCard $card   The card instance with the data for this card.
+    * @param Page $page             The page this card belongs to.
     * @return void
     */
     public function ___createCardForPage(TrelloWireCard $card, Page $page)
@@ -226,9 +251,9 @@ class TrelloWire extends Wire implements Module
         $page->message($this->_('Successfully created a new Trello card for this page!'));
         // save the card ID to the page meta data so it can be updated later
         $page->meta(self::CARD_REFERENCE_KEY, $response->id);
-        $checklistItems = $this->getDefaultChecklistItems();
+        $checklistItems = $this->getDefaultChecklistItems($page);
         if (!empty($checklistItems)) {
-            $checklistTitle = $this->getDefaultChecklistTitle();
+            $checklistTitle = $this->getDefaultChecklistTitle($page);
             $checklist = $this->api()->addChecklistToCard($response->id, $checklistTitle);
             if ($checklist && $checklist->id) {
                 foreach ($checklistItems as $item) {
@@ -239,29 +264,43 @@ class TrelloWire extends Wire implements Module
     }
 
     /**
-     * Get the default title for the checklist added to new Trello cards.
+     * Get the default title for the checklist added to new Trello cards. It
+     * receives the page the card belongs to as an argument so you can hook this
+     * method and modify the return value based on the page.
      *
+     * @param Page $page
      * @return string
      */
-    public function ___getDefaultChecklistTitle(): string
+    public function ___getDefaultChecklistTitle(Page $page): string
     {
-        return $this->CardChecklistTitle ?: (new TrelloWireConfig())->getDefaults()['CardChecklistTitle'];
+        return wirePopulateStringTags(
+            $this->CardChecklistTitle ?: (new TrelloWireConfig())->getDefaults()['CardChecklistTitle'],
+            $page
+        );
     }
 
     /**
-     * Get a list of items to add to the checklist added to new Trello cards.
+     * Get a list of items to add to the checklist added to new Trello cards. It
+     * received the page the card belongs to as an argument so you can hook this
+     * method and modify the return value based on the page.
      *
+     * @param Page $page
      * @return array
      */
-    public function ___getDefaultChecklistItems(): array
+    public function ___getDefaultChecklistItems(Page $page): array
     {
         if (!$this->CardChecklistItems) return [];
-        return array_filter(
-            preg_split('/[\n\r]+/', $this->CardChecklistItems),
-            function ($item) {
-                return !empty($item);
-            }
-        );
+        return array_map(
+            function ($item) use ($page) {
+                return wirePopulateStringTags($item, $page);
+            },
+            array_filter(
+                preg_split('/[\n\r]+/', $this->CardChecklistItems),
+                function ($item) {
+                    return !empty($item);
+                }
+            )
+    );
     }
 
     /**
