@@ -18,6 +18,17 @@ class TrelloWireCard extends WireData implements Module
     }
 
     /**
+     * Set the page this card belongs to.
+     *
+     * @param Page $page
+     * @return void
+     */
+    public function ___setPage(Page $page): void
+    {
+        $this->set('page', $page);
+    }
+
+    /**
      * Set this cards ID (only used for cards that already exist in Trello).
      *
      * @param string $id

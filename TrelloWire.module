@@ -36,6 +36,7 @@ class TrelloWire extends Wire implements Module
             'title' => __('Trello Wire'),
             'summary' => __('A module providing a bridge to trello to create cards based on pages.'),
             'author' => "Moritz L'Hoest",
+            'href' => 'https://github.com/MoritzLost/TrelloWire',
             'version' => '0.1.0',
             'icon' => 'trello',
             'autoload' => true,
@@ -211,6 +212,7 @@ class TrelloWire extends Wire implements Module
    {
        $defaultSettings = (new TrelloWireConfig())->getDefaults();
        $TrelloWireCard = $this->modules->get('TrelloWireCard');
+       $TrelloWireCard->setPage($page);
        $TrelloWireCard->setList($this->TargetList);
        $titleField = !empty($this->CardTitle) ? $this->CardTitle : $defaultSettings['CardTitle'];
        $TrelloWireCard->setTitle(wirePopulateStringTags($titleField, $page));
@@ -267,7 +269,7 @@ class TrelloWire extends Wire implements Module
      * receives the page the card belongs to as an argument so you can hook this
      * method and modify the return value based on the page.
      *
-     * @param Page $page
+     * @param Page $page    The page the card being currently created is based on.
      * @return string
      */
     public function ___getDefaultChecklistTitle(Page $page): string
@@ -283,7 +285,7 @@ class TrelloWire extends Wire implements Module
      * received the page the card belongs to as an argument so you can hook this
      * method and modify the return value based on the page.
      *
-     * @param Page $page
+     * @param Page $page    The page the card being currently created is based on.
      * @return array
      */
     public function ___getDefaultChecklistItems(Page $page): array
@@ -306,7 +308,7 @@ class TrelloWire extends Wire implements Module
      * Create a new Trello card through the API based on a TrelloWireCard instance.
      *
      * @param TrelloWireCard $card  The card with the values to post to Trello.
-     * @return bool|object          Returns the card object returned from the API, or false on failure.
+     * @return object|bool          Returns the card object returned from the API, or false on failure.
      */
     public function ___trelloCreateCard(TrelloWireCard $card)
     {
@@ -320,8 +322,8 @@ class TrelloWire extends Wire implements Module
     /**
      * Update an existing Trello card with values from the TrelloWireCard instance.
      *
-     * @param TrelloWireCard $card
-     * @return void
+     * @param TrelloWireCard $card  The card with a values to update on Trello. Must contain an ID property referencing an existing card.
+     * @return object|bool          Returns the card object returned from the API, or false on failure.
      */
     public function ___trelloUpdateCard(TrelloWireCard $card)
     {
