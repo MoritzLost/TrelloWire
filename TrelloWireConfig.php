@@ -154,7 +154,6 @@ class TrelloWireConfig extends ModuleConfig
 
             $CardLabels = $this->buildInputfield('InputfieldCheckboxes', 'CardLabels', $this->_('Card labels'), 34);
             $availableLabels = $TrelloWire->TargetBoard ? $TrelloWireApi->labels($TrelloWire->TargetBoard) : null;
-            bd($availableLabels);
             if ($availableLabels) {
                 $CardLabels->addOptions(array_combine(
                     array_column($availableLabels, 'id'),
@@ -173,8 +172,8 @@ class TrelloWireConfig extends ModuleConfig
             }
 
             $CardChecklistItems = $this->buildInputfield('InputfieldTextarea', 'CardChecklistItems', $this->_('Card checklist items'), 33);
-            $CardChecklistItems->description = $this->_('If you want new cards to contain a predefined checklist, enter checklist items here. One item per line.');
-            $CardChecklistItems->notes = $this->_('Each item is passed through [wirePopulateStringTags](https://processwire.com/api/ref/functions/wire-populate-string-tags/) individually.');
+            $CardChecklistItems->description = $this->_('If you want new cards to contain a predefined checklist, enter checklist items here. One item per line. Each item is passed through [wirePopulateStringTags](https://processwire.com/api/ref/functions/wire-populate-string-tags/) individually.');
+            $CardChecklistItems->notes = $this->_('**WARNING:** Creating many checklist items on new card will substantially increase the card creation time, because the Trello API only allows one item per request.');
 
             $CardChecklistTitle = $this->buildInputfield('InputfieldText', 'CardChecklistTitle', $this->_('Card checklist title'), 33);
             $CardChecklistTitle->description = $this->_('Set the title for the checklist for new cards.');

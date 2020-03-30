@@ -215,9 +215,9 @@ class TrelloWire extends Wire implements Module
        $TrelloWireCard->setPage($page);
        $TrelloWireCard->setList($this->TargetList);
        $titleField = !empty($this->CardTitle) ? $this->CardTitle : $defaultSettings['CardTitle'];
-       $TrelloWireCard->setTitle(wirePopulateStringTags($titleField, $page));
+       $TrelloWireCard->setTitle(wirePopulateStringTags($titleField, $page, ['entityDecode' => true]));
        if (!empty($this->CardBody)) {
-           $TrelloWireCard->setBody(wirePopulateStringTags($this->CardBody, $page));
+           $TrelloWireCard->setBody(wirePopulateStringTags($this->CardBody, $page, ['entityDecode' => true]));
        }
        // for existing cards (card id stored in page settings), restore the id
        $existingCardId = $page->meta(self::CARD_REFERENCE_KEY);
@@ -276,7 +276,8 @@ class TrelloWire extends Wire implements Module
     {
         return wirePopulateStringTags(
             $this->CardChecklistTitle ?: (new TrelloWireConfig())->getDefaults()['CardChecklistTitle'],
-            $page
+            $page,
+            ['entityDecode' => true]
         );
     }
 
@@ -293,7 +294,7 @@ class TrelloWire extends Wire implements Module
         if (!$this->CardChecklistItems) return [];
         return array_map(
             function ($item) use ($page) {
-                return wirePopulateStringTags($item, $page);
+                return wirePopulateStringTags($item, $page, ['entityDecode' => true]);
             },
             array_filter(
                 preg_split('/[\n\r]+/', $this->CardChecklistItems),
