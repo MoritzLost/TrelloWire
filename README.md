@@ -58,111 +58,6 @@ This is a brief overview of how the module is structured and how it maps pages t
 
 Whenever an applicable page is published (or created, depending on the settings), TrelloWire creates a new card on Trello using data from that page. The Trello API returns the card ID. This ID is then stored inside the [page's meta data](https://processwire.com/blog/posts/pw-3.0.133/#new-page-gt-meta-method). This way, ProcessWire pages are mapped to Trello cards. For subsequent page save events, TrelloWire will check if the page meta data contains a card ID and update the corresponding card according to the settings. Likewise, if you want to check whether a TrelloWireCard instance is intended for a new card or an existing card, check if it's `id` property is set. If it does, it references an existing card.
 
-## Hookable method list
-
-Most methods inside TrelloWire and TrelloWireCard are hookable so you can customize the behaviour and workflow mapping. The following list includes all hookable methods and explains when they are called.
-
-### TrelloWire hooks
-
-- `TrelloWire::buildCardData`
-    - `@param Page $page`        The page this card will belong to.
-    - `@return TrelloWireCard`   The card object with values based on the page.
-
-Builds a TrelloWireInstance using data from the passed page. This will automatically set the card's ID if the page already has a reference to an existing card, so you can check the card's ID to determine whether this card will be used to create or update card. This method is called in multiple places, whenever a TrelloWire hook needs to extract data from a page based on the module configuratio.
-
----
-
-- `TrelloWire::createCardForPage`
-    - `@param TrelloWireCard $card`   The card instance with the data for this card.
-    - `@param Page $page`             The page this card belongs to.
-    - `@return void`
-
-This takes a TrelloWireCard and a page and creates a new card on Trello through the API. It also stores the new card's ID in the page meta data. This method is called when the module wants to create a Trello card after a new page is created or published (depeding on the *Card Creation Trigger* setting). You can hook before this to modify the card before it is posted to Trello or abort the process entirely. Or hook after this to add further content to the card using the API.
-
----
-
-- `TrelloWire::getDefaultChecklistTitle`
-    - `@param Page $page`   The page the card being currently created is based on.
-    - `@return string`
-
-Returns the title for the checklist on new cards using based on the module settings and the passed page. Note this will only ever be called if `getDefaultChecklistItems` doesn't return an empty result.
-
----
-
-- `TrelloWire::getDefaultChecklistItems`
-    - `@param Page $page`   The page the card being currently created is based on.
-    - `@return array`
-
-Returns an array of strings which will become checklist items for the default checklist on new cards.
-
----
-
-- `TrelloWire::trelloCreateCard`
-    - `@param TrelloWireCard $card`  The card with the values to post to Trello.
-    - `@return object|bool`          Returns the card object returned from the API, or false on failure.
-
-Creates a new card on Trello using the API component with values from the TrelloWireCard.
-
----
-
-- `TrelloWire::trelloUpdateCard`
-    - `@param TrelloWireCard $card`  The card with a values to update on Trello. Must contain an ID property referencing an existing card.
-    - `@return object|bool`          Returns the card object returned from the API, or false on failure.
-
-Updates an existing card's title and body (description) using the passed TrelloWireCard.
-
----
-
-### TrelloWireCard hooks
-
-The TrelloWireCard component is just a container for page data. All properties are set through hookable methods to their data can be modified whenever it is set. Note that the card has a `page` property which holds the page this card belongs to, so you can always access it's values. TrelloWire will always set the page property first, so if you are hooking any of the other methods you can rely on the page property being initialized at that point.
-
-- `TrelloWireCard::setPage`
-    - `@param Page $page`
-    - `@return void`
-
-Set the page this card belongs to.
-
----
-
-- `TrelloWireCard::setId`
-    - `@param string $id`
-    - `@return void`
-
-Set this cards ID (only used for cards that already exist in Trello).
-
----
-
-- `TrelloWireCard::setList`
-    - `@param string $idList`
-    - `@return void`
-
-Set the ID of the list this card belongs to.
-
----
-
-- `TrelloWireCard::setTitle`
-    - `@param string $title`
-    - `@return void`
-
-Set the title / name of this card.
-
----
-
-- `TrelloWireCard::setBody`
-    - `@param string $body`
-    - `@return void`
-
-Set the body / description of this card.
-
----
-
-- `TrelloWireCard::setLabels`
-    - `@param array $labelIds`
-    - `@return void`
-
-Set the IDs of labels belonging to this cards. Note that label IDs are specific to each board.
-
 ## Using the API class
 
 The `TrelloWireApi` class is a wrapper around the Trello API and can be used to conveniently send requests to the API. The easiest way to get an instance of the API configured with the API credentials set in the module configuration is the helper method on the main module.
@@ -188,3 +83,148 @@ After making a request through one of the module methods, you can check the resu
 - `$TrelloWireApi->lastRequest` contains the WireHttp instance used for the last request (a new one is created for every request).
 - `$TrelloWireApi->lastResponseCode` contains the HTTP response code of the last request as an integer.
 - `$TrelloWireApi->lastResponseOk` will be `true` if the last request was successful (HTTP response code in the 2XX range) and `false` if it wasn't.
+
+## API & hook documentation
+
+Below you'll find a complete API documentation for the module. Most methods inside TrelloWire and TrelloWireCard are hookable so you can customize the behaviour and workflow mapping (those methods are labelled accordingly).
+
+### ProcessWire\TrelloWire
+
+Retrieve a new instance of TrelloWire through ProcessWire's API:
+
+```php
+$TrelloWire = wire('modules')->get('TrelloWire');
+```
+
+---
+
+- `TrelloWire::api`
+    - `@return TrelloWireApi|null`
+
+Get an instance of the TrelloWireApi class using the API key and token set through the module configuration. This will return null if the API key or token are missing.
+
+---
+
+- `TrelloWire::buildCardData`
+    - **Hookable**
+    - `@param Page $page`        The page this card will belong to.
+    - `@return TrelloWireCard`   The card object with values based on the page.
+
+Construct a new TrelloWireCard instance based on the passed page using the module settings. Hook after this if you want to change how Trello card data is generated for pages. The method will automatically set the card's ID if the page already has a reference to an existing card, so you can check the card's ID to determine whether this card will be used to create or update card. This method is called in multiple places, whenever a TrelloWire hook needs to extract data from a page based on the module configuration.
+
+---
+
+- `TrelloWire::createCardForPage`
+    - **Hookable**
+    - `@param TrelloWireCard $card`   The card instance with the data for this card.
+    - `@param Page $page`             The page this card belongs to.
+    - `@return void`
+
+Creates a card on Trello based on the data contained in the passed TrelloWireCard. It also creates a new checklist on this card based on the module settings (Checklist title & items). Those settings are retrieved through the corresponding helper methods so you can modify or remove them by hooking those methods. After the card is created, the module will also store it's ID in the meta data of the passed $page, so it can be updated later. This method is called when the module wants to create a Trello card after a new page is created or published (depeding on the *Card Creation Trigger* setting). You can hook before this to modify the card before it is posted to Trello or abort the process entirely. Or hook after this to add further content to the card using the API.
+
+---
+
+- `TrelloWire::getDefaultChecklistTitle`
+    - **Hookable**
+    - `@param Page $page`   The page the card being currently created is based on.
+    - `@return string`
+
+Get the default title for the checklist added to new Trello cards. It receives the page the card belongs to as an argument so you can hook this method and modify the return value based on the page.
+
+---
+
+- `TrelloWire::getDefaultChecklistItems`
+    - **Hookable**
+    - `@param Page $page`   The page the card being currently created is based on.
+    - `@return array`
+
+Get a list of items to add to the checklist added to new Trello cards. It received the page the card belongs to as an argument so you can hook this method and modify the return value based on the page.
+
+---
+
+- `TrelloWire::trelloCreateCard`
+    - **Hookable**
+    - `@param TrelloWireCard $card`  The card with the values to post to Trello.
+    - `@return object|bool`          Returns the card object returned from the API, or false on failure.
+
+Create a new Trello card through the API based on a TrelloWireCard instance.
+
+---
+
+- `TrelloWire::trelloUpdateCard`
+    - **Hookable**
+    - `@param TrelloWireCard $card`  The card with a values to update on Trello. Must contain an ID property referencing an existing card.
+    - `@return object|bool`          Returns the card object returned from the API, or false on failure.
+
+Update an existing Trello card's title and body with values from the TrelloWireCard instance.
+
+### ProcessWire\TrelloWireCard
+
+The TrelloWireCard component is just a container for page data. All properties are set through hookable methods to their data can be modified whenever it is set. Note that the card has a `page` property which holds the page this card belongs to, so you can always access it's values. TrelloWire will always set the page property first, so if you are hooking any of the other methods you can rely on the page property being initialized at that point.
+
+You can create an empty instance through ProcessWire's API, or create a populated instance with data based on a ProcessWire page using the helper method on `TrelloWire`:
+
+```php
+// create an empty instance
+$TrelloWireCard = wire('modules')->get('TrelloWireCard');
+
+// create an instance based on a page
+$TrelloWireCard = wire('modules')->get('TrelloWire')->buildCardData($page);
+```
+
+---
+
+- `TrelloWireCard::setPage`
+    - **Hookable**
+    - `@param Page $page`
+    - `@return void`
+
+Set the page this card belongs to.
+
+---
+
+- `TrelloWireCard::setId`
+    - **Hookable**
+    - `@param string $id`
+    - `@return void`
+
+Set this card's ID (only used for cards that already exist in Trello).
+
+---
+
+- `TrelloWireCard::setList`
+    - **Hookable**
+    - `@param string $idList`
+    - `@return void`
+
+Set the ID of the list this card belongs to.
+
+---
+
+- `TrelloWireCard::setTitle`
+    - **Hookable**
+    - `@param string $title`
+    - `@return void`
+
+Set the title / name of this card.
+
+---
+
+- `TrelloWireCard::setBody`
+    - **Hookable**
+    - `@param string $body`
+    - `@return void`
+
+Set the body / description of this card.
+
+---
+
+- `TrelloWireCard::setLabels`
+    - **Hookable**
+    - `@param array $labelIds`
+    - `@return void`
+
+Set the IDs of labels belonging to this cards. Note that label IDs are specific to each board.
+
+### ProcessWire\TrelloWire\TrelloWireApi
+

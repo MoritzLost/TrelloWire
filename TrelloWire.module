@@ -202,8 +202,14 @@ class TrelloWire extends Wire implements Module
 
     /**
     * Construct a new TrelloWireCard instance based on the passed page using the
-    * module settings. Hook this if you want to change how Trello card data is
-    * generated for pages.
+    * module settings.
+    * Hook after this if you want to change how Trello card data is
+    * generated for pages. The method will automatically set the card's ID if
+    * the page already has a reference to an existing card, so you can check the
+    * card's ID to determine whether this card will be used to create or update
+    * card.
+    * This method is called in multiple places, whenever a TrelloWire hook needs
+    * to extract data from a page based on the module configuration.
     *
     * @param Page $page        The page this card will belong to.
     * @return TrelloWireCard   The card object with values based on the page.
@@ -238,6 +244,11 @@ class TrelloWire extends Wire implements Module
     * them by hooking those methods.
     * After the card is created, the module will also store it's ID in the meta
     * data of the passed $page, so it can be updated later.
+    * This method is called when the module wants to create a Trello card after
+    * a new page is created or published (depeding on the *Card Creation Trigger*
+    * setting). You can hook before this to modify the card before it is posted
+    * to Trello or abort the process entirely. Or hook after this to add further
+    * content to the card using the API.
     *
     * @param TrelloWireCard $card   The card instance with the data for this card.
     * @param Page $page             The page this card belongs to.
@@ -321,7 +332,8 @@ class TrelloWire extends Wire implements Module
     }
 
     /**
-     * Update an existing Trello card with values from the TrelloWireCard instance.
+     * Update an existing Trello card's title and body with values from the
+     * TrelloWireCard instance.
      *
      * @param TrelloWireCard $card  The card with a values to update on Trello. Must contain an ID property referencing an existing card.
      * @return object|bool          Returns the card object returned from the API, or false on failure.
@@ -330,6 +342,9 @@ class TrelloWire extends Wire implements Module
     {
         if (!$card->id) return false;
         if (!$api = $this->api()) return null;
-        return $api->updateCard($card->id, $card->title, $card->body);
+        return $api->updateCard($card->id, [
+            'name' => $card->title,
+            'desc' => $card->body
+        ]);
     }
 }

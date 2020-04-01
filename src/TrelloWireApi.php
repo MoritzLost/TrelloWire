@@ -232,18 +232,12 @@ class TrelloWireApi extends Wire
      * Update an existing card on Trello.
      *
      * @param string $idCard        The ID of the card.
-     * @param string|null $title    New title / name for the card. Pass null to leave the existing title.
-     * @param string|null $body     New body / description for the card. Pass null to leave the existing body.
-     * @param array $addData        Additional fields to update (associative array).
+     * @param array $data           Additional fields to update (associative array).
      * @return object|bool          Returns the card object on success or false on failure.
      */
-    public function updateCard(string $idCard, ?string $title = null, ?string $body = null, array $addData = [])
+    public function updateCard(string $idCard, array $data = [])
     {
-        $updateFields = array_merge($addData, array_filter([
-            'name' => $title,
-            'desc' => $body,
-        ]));
-        $result = $this->put(sprintf('cards/%s', $idCard), $updateFields);
+        $result = $this->put(sprintf('cards/%s', $idCard), $data);
         return $this->lastResponseOk ? json_decode($result) : false;
     }
 
@@ -256,7 +250,7 @@ class TrelloWireApi extends Wire
      */
     public function moveCard(string $idCard, string $idList)
     {
-        return $this->updateCard($idCard, null, null, ['idList' => $idList]);
+        return $this->updateCard($idCard, ['idList' => $idList]);
     }
 
     /**
@@ -267,7 +261,7 @@ class TrelloWireApi extends Wire
      */
     public function archiveCard(string $idCard)
     {
-        return $this->updateCard($idCard, null, null, ['closed' => true]);
+        return $this->updateCard($idCard, ['closed' => true]);
     }
 
     /**
@@ -278,7 +272,7 @@ class TrelloWireApi extends Wire
      */
     public function restoreCard(string $idCard)
     {
-        return $this->updateCard($idCard, null, null, ['closed' => false]);
+        return $this->updateCard($idCard, ['closed' => false]);
     }
 
     /**
@@ -291,6 +285,22 @@ class TrelloWireApi extends Wire
     {
         $this->delete(sprintf('cards/%s', $idCard));
         return $this->lastResponseOk;
+    }
+
+    /**
+     * Add a comment to a card.
+     *
+     * @param string $idCard    The ID of the card to comment on.
+     * @param string $comment   The comment as a string (supports markdown).
+     * @return object|bool      Returns the card object on success or false on failure.
+     */
+    public function addCommentToCard(string $idCard, string $comment)
+    {
+        $result = $this->post(
+            sprintf('cards/%s/actions/comments', $idCard),
+            ['text' => $comment]
+        );
+        return $this->lastResponseOk ? json_decode($result) : false;
     }
 
     /**
