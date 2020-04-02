@@ -228,3 +228,211 @@ Set the IDs of labels belonging to this cards. Note that label IDs are specific 
 
 ### ProcessWire\TrelloWire\TrelloWireApi
 
+The Trello Wire API can be used independently of the rest of the module. See [Using the API class](#using-the-api-class) for information on how to best instantiate the class and how it is structured.
+
+---
+
+- `$lastRequest`
+    - `@var WireHttp` Always contains the WireHttp instance used for the last request made through this instance.
+
+---
+
+- `$lastResponseCode`
+    - `@var int` Always contains the HTTP response code of the last request made through this instance.
+
+---
+
+- `$lastResponseOk`
+    - `@var bool` Always contains true if the last request made through this instance was successful (status code 2XX) or false if it wasn't.
+
+---
+
+- `TrelloWireApi::send`
+     - `@param string $endpoint`  The endpoint to call, including relevant parameters, without a leading slash.
+     - `@param string $method`    The HTTP method to use (one of GET, POST, PUT, DELETE).
+     - `@param array $data`       Additional data to send with this request.
+     - `@see` https://processwire.com/api/ref/wire-http/
+     - `@return mixed`
+
+Send a request to any endpoint of the Trello API. This passes requests to the appropriate method of ProcessWire's WireHttp class, so check the documentation for possible return values. You can always access the WireHttp instance used for the last request through the public $lastRequest property.
+
+---
+
+- `TrelloWireApi::get`
+     - `@param string $endpoint`  The endpoint to call, including relevant parameters, without a leading slash.
+     - `@param array $data`       Associative array of parameters to add to this request.
+     - `@return mixed`
+
+Send a GET request to the specified endpoint of the Trello API.
+
+---
+
+- `TrelloWireApi::post`
+     - `@param string $endpoint`  The endpoint to post to, including relevant parameters, without a leading slash.
+     - `@param array $data`       Associative array of data to send with this request.
+     - `@return mixed`
+
+Send a POST request to the specified endpoint of the Trello API.
+
+---
+
+- `TrelloWireApi::put`
+     - `@param string $endpoint`  The endpoint to call, including relevant parameters, without a leading slash.
+     - `@param array $data`       Associative array of data to send with this request.
+     - `@return mixed`
+
+Send a PUT request to the specified endpoint of the Trello API.
+
+---
+
+- `TrelloWireApi::delete`
+     - `@param string $endpoint`  The endpoint to call, including relevant parameters, without a leading slash.
+     - `@param array $data`       Associative array of data to send with this request.
+     - `@return mixed`
+
+Send a DELETE request to the specified endpoint of the Trello API.
+
+---
+
+- `TrelloWireApi::isResponseCodeOk`
+     - `@param integer $httpCode`
+     - `@return boolean`
+
+Check if an HTTP response code is in the OK range (2XX).
+
+---
+
+- `TrelloWireApi::isValidToken`
+     - `@return boolean`
+
+Check if the API token this instance is configured to use is valid.
+
+---
+
+- `TrelloWireApi::boards`
+     - `@param array $fields`     Board fields to include in the response.
+     - `@param string $filter`    The filter to use for this request.
+     - `@return array|bool       Returns an array of board objects or false on failure.`
+
+Get all boards belonging to the user that created the current API token.
+
+---
+
+- `TrelloWireApi::lists`
+     - `@param string $idBoard`   The ID of the board.
+     - `@param array $fields`     The board fields to include in the response.
+     - `@param string $filter`    The filter to use for this request.
+     - `@param string $cards`     The type of cards to include in the response.
+     - `@param array $cardFields` The card fields to include in the response.
+     - `@return array|boolean    Returns an array of list objects or false on failure.`
+
+Get the lists existing in a board.
+
+---
+
+- `TrelloWireApi::labels`
+     - `@param string $idBoard`   The ID of the board.
+     - `@param array $fields`     The label fields to include in the response.
+     - `@return array|boolean`
+
+Get the available labels of a board.
+
+---
+
+- `TrelloWireApi::card`
+     - `@param string $idCard`    The ID of the card to retrieve.
+     - `@param array $fields`     Array of fields to include in the response.
+     - `@return object|bool      Returns the card object on success or false on failure.`
+
+Get a card from the API.
+
+---
+
+- `TrelloWireApi::createCard`
+     - `@param string $idList`    The ID of the list to add the card to.
+     - `@param string $title`     The name / title of the card.
+     - `@param string $body`      The description / body of the card.
+     - `@param array $addData`    Additional fields to pass to the API (associative array).
+     - `@return object|boolean   Returns the card object on success or false on failure.`
+
+Post a new card to the specified list. Returns true on success, false on failure.
+
+---
+
+- `TrelloWireApi::updateCard`
+     - `@param string $idCard`        The ID of the card.
+     - `@param array $data`           Additional fields to update (associative array).
+     - `@return object|bool          Returns the card object on success or false on failure.`
+
+Update an existing card on Trello.
+
+---
+
+- `TrelloWireApi::moveCard`
+     - `@param string $idCard`    The ID of the card to move.
+     - `@param string $idList`    The ID of the list to move the card to.
+     - `@return object|bool      Returns the card object on success or false on failure.`
+
+Move a card to a different list.
+
+---
+
+- `TrelloWireApi::archiveCard`
+     - `@param string $idCard`    The ID of the card to close.
+     - `@return object|bool      Returns the card object on success or false on failure.`
+
+Archive / close a card.
+
+---
+
+- `TrelloWireApi::restoreCard`
+     - `@param string $idCard`    The ID of the card to restore.
+     - `@return object|bool      Returns the card object on success or false on failure.`
+
+Restore / open a card.
+
+---
+
+- `TrelloWireApi::deleteCard`
+     - `@param string $idCard`    The ID of the card to delete.
+     - `@return boolean          Returns true on success or false on failure.`
+
+Permanently delete a card. Cards deleted this way can NOT be restored!
+
+---
+
+- `TrelloWireApi::addCommentToCard`
+     - `@param string $idCard`    The ID of the card to comment on.
+     - `@param string $comment`   The comment as a string (supports markdown).
+     - `@return object|bool      Returns the card object on success or false on failure.`
+
+Add a comment to a card.
+
+---
+
+- `TrelloWireApi::addLabelToCard`
+     - `@param string $idCard`    The ID of the card to add the label to.
+     - `@param string $idLabel`   The ID of the label to add (must be one of the labels available on the board the card is on).
+     - `@return object|bool      Returns an array of label IDs on the card (including the new one) upon success or false on failure.`
+
+Add a label to a card.
+
+---
+
+- `TrelloWireApi::addChecklistToCard`
+     - `@param string $idCard`    The ID of the card.
+     - `@param string $title`     The title of the checklist.
+     - `@return object|bool      Returns the checklist object on success or false on failure.`
+
+Add a new checklist to a card.
+
+---
+
+- `TrelloWireApi::addItemToChecklist`
+     - `@param string $idChecklist`   The ID of the checklist.
+     - `@param string $title`         The title / name of the new item.
+     - `@param boolean $checked`      Is the new item checked?
+     - `@param string $position`      Position of the new item ('top', 'bottom', or positive integer).
+     - `@return boolean              Returns true on success or false on failure.`
+
+Add an item to a checklist.
