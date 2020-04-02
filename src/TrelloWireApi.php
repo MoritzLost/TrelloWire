@@ -207,6 +207,23 @@ class TrelloWireApi extends Wire
     }
 
     /**
+     * Get a card from the API.
+     *
+     * @param string $idCard    The ID of the card to retrieve.
+     * @param array $fields     Array of fields to include in the response.
+     * @return object|bool      Returns the card object on success or false on failure.
+     */
+    public function card(string $idCard, array $fields = ['all'])
+    {
+        $result = $this->get(sprintf(
+            'cards/%1$s?fields=%2$s',
+            $idCard,
+            implode(',', $fields)
+        ));
+        return $this->lastResponseOk ? json_decode($result) : false;
+    }
+
+    /**
      * Post a new card to the specified list. Returns true on success, false on failure.
      *
      * @param string $idList    The ID of the list to add the card to.
@@ -301,6 +318,22 @@ class TrelloWireApi extends Wire
             ['text' => $comment]
         );
         return $this->lastResponseOk ? json_decode($result) : false;
+    }
+
+    /**
+     * Add a label to a card.
+     *
+     * @param string $idCard    The ID of the card to add the label to.
+     * @param string $idLabel   The ID of the label to add (must be one of the labels available on the board the card is on).
+     * @return object|bool      Returns an array of label IDs on the card (including the new one) upon success or false on failure.
+     */
+    public function addLabelToCard(string $idCard, string $idLabel)
+    {
+        $result = $this->post(
+            sprintf('cards/%s/idLabels', $idCard),
+            ['value' => $idLabel]
+        );
+        return $this->lastResponseOk ? json_decode($result): false;
     }
 
     /**
