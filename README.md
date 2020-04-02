@@ -1,22 +1,23 @@
 # Trello Wire - Create Trello cards based on ProcessWire pages
 
-This is a module for the [ProcessWire CMF](https://processwire.com/) that allows you to automatically create [Trello cards](https://trello.com/) for ProcessWire pages and update them when the pages are updated. This allows you to setup connected workflows. Card properties and change handling behaviour can be customized through the extensive module configuration. Every action the module performs is hookable, so you can modify when and how cards are created as much as you need to. The module also contains an API-component that makes it easy to make requests to the Trello API and extend the module workflows however you like.
+This is a module for the [ProcessWire CMF](https://processwire.com/) that allows you to automatically create [Trello cards](https://trello.com/) for ProcessWire pages and update them when the pages are updated. This allows you to setup connected workflows. Card properties and change handling behaviour can be customized through the extensive module configuration. Every action the module performs is hookable, so you can modify when and how cards are created as much as you need to. The module also contains an API-component that makes it easy to make requests to the Trello API and build your own connected ProcessWire-Trello workflows.
 
 ## Table of contents
 
 - [Motivation and how to get started](#motivation-and-how-to-get-started)
 - [Advanced configuration and workflow adjustments](#advanced-configuration-and-workflow-adjustments)
 - [How the module works](#how-the-module-works)
-- [Hookable method list](#hookable-method-list)
-    - [TrelloWire hooks](#trellowire-hooks)
-    - [TrelloWireCard hooks](#trellowirecard-hooks)
 - [Using the API class](#using-the-api-class)
+- [API & hook documentation](#api--hook-documentation)
+    - [ProcessWire\TrelloWire](#processwiretrellowire)
+    - [ProcessWire\TrelloWireCard](#processwiretrellowirecard)
+    - [ProcessWire\TrelloWire\TrelloWireApi](#processwiretrellowiretrellowireapi)
 
 ## Motivation and how to get started
 
 This module is supposed to enable custom workflows involving a bridge between ProcessWire pages and Trello cards. What you do with that is up to you. Here are some usage examples:
 
-- If you create pages based on form submissions, you can create a Trello card for each new form submission, so someone on your team can claim the card and handle the request. This way, you can keep track of which requests your team has already responded to and how many pending requests there are. If you trash or delete the form submission pages in ProcessWire after you have dealt with them, you can have the module automatically archive or move the corresponding cards, so you don't have to manage the requests in two places. If you are using [Form Builder](https://processwire.com/store/form-builder), it has [an option to push new requests to pages](https://processwire.com/store/form-builder/#form-submission-features), so you can recreate this workflows very easily.
+- If you create pages based on form submissions, you can create a Trello card for each new form submission, so someone on your team can claim the card and handle the request. This way, you can keep track of which requests your team has already responded to and how many pending requests there are. If you trash or delete the form submission pages in ProcessWire after you have dealt with them, you can have the module automatically archive or move the corresponding cards, so you don't have to manage the requests in two places. If you are using [Form Builder](https://processwire.com/store/form-builder), it has [an option to push new requests to pages](https://processwire.com/store/form-builder/#form-submission-features), so you can recreate this workflow very easily.
 - If your site has some kind of product database, you can map individual product pages to Trello cards. This way, you can manage and assign product pages to the editors on your team, making it easier to coordinate simultaneous work on your site.
 
 To get started, install the module. Right now you have to download it manually, but the module is pending approval in the ProcessWire modules directory and will soon be installable using the class name `TrelloWire`. Note the system requirements:
@@ -24,11 +25,11 @@ To get started, install the module. Right now you have to download it manually, 
 - PHP >= 7.2
 - ProcessWire >= 3.0.133
 
-After you have installed the module, go to it's configuration page (*Modules -> Configure -> TrelloWire*). To access your Trello board, you need to provide an API key and API token. Use the link in the API key field to generate it (make sure you are logged in to Trello). After you have entered the API key, save the page once, then follow the link in the API token field to generate a new API token. **Attention:** The API key can be created with any account, but the API token needs to be created by an account that has access to the board you want to connect to. After entering the API token and saving the configuration, the module will check if the token is valid and warn you if it isn't.
+After you have installed the module, go to it's configuration page (*Modules -> Configure -> TrelloWire*). To access your Trello board, you need to provide an API key and API token. Use the link in the API key field to generate your personal key. After you have entered the API key, save the page once, then follow the link in the API token field to generate a new API token. **Attention:** The API key can be created with any account, but the API token needs to be created by an account that has access to the board you want to connect to. After entering the API token and saving the configuration, the module will check if the token is valid and warn you if it isn't.
 
 After you have entered valid API credentials, the rest of the options will appear. For now, you only need to worry about the option **Templates to create trello cards for**. Select one or more templates that you want to create Trello cards for. In the examples above, that would be the form submission template or the product template, respectively. You also need to set a target board and a target list as the default location for new cards. Note that after setting the target board, you have to save the configuration once so the module can retreive the lists on that board.
 
-After those options are set, you're good to go. To test if everything is working, add a new page of one of the templates you selected previously and publish it. There should now be a new card on your Trello board with the same name as your new page.
+After those options are set, you're good to go. To test if everything is working, add a new page using one of the templates you selected previously and publish it. There should now be a new card on your Trello board with the same name as your new page.
 
 If everything is working, you can check out the other options available in the module configuration to adjust everything for your intended workflow.
 
@@ -36,15 +37,15 @@ If everything is working, you can check out the other options available in the m
 
 The module provides extensive options to control when and where cards are created, what they contain, and what should happen if a page corresponding to a card is modified or deleted. The options are explained on the configuration page, but here's a quick overview of what you can do:
 
-- By default, the card title will match the page title, and the card description will contain only a link to the ProcessWire page on your website. You can change those to either dynamic place with page replacement fields in curly braces (e.g. `{title}`) or completely static text.
+- By default, the card title will match the page title, and the card description will contain only a link to the ProcessWire page on your website. You can change those to either dynamic text with page replacement fields in curly braces (e.g. `{title}`) or completely static text.
 - You can add any number of default labels from your board to the card. Labels are specific to boards, so if you change the target board or change the labels on Trello, you may need to adjust that option.
-- You can also add a checklist to new cards. If you set at least one checklist item (through the textarea field, one item per line), you can also change the checklists's title. Both of those settings allow field replacements as well.
-- By default, new cards are create when an applicable page is *published*, but you can change that to add cards as soon as the page is *added* instead. You can also turn off automatic card creation entirely, which may be useful if you want to create cards programmatically only in certain situations.
-- You can set the module to automatically update a card's title and body whenever the page it belongs to is updated. Be careful with this, as it will overwrite manual changes perform on Trello.
+- You can also add a checklist to new cards. If you set at least one checklist item (through the textarea field, one item per line), you can also change the checklist's title. Both of those settings allow field replacements as well.
+- By default, new cards are created when an applicable page is *published*, but you can change that to add cards as soon as a page is *added* instead. You can also turn off automatic card creation entirely, which may be useful if you want to create cards programmatically only in certain situations.
+- You can set the module to automatically update a card's title and body whenever the page it belongs to is updated. Be careful with this, as it will overwrite manual changes performed on Trello.
 - You can control what happens if a pages is published, hidden, trashed and deleted. For each of those status changes you have the following options:
-    - Move the card to a different list. In this case, you can select a list to move the card to. This is useful if you have a *Done / Obsolete* list or something like this to contain entries that have been dealt with.
+    - Move the card to a different list. In this case, you can select a list to move the card to. This is useful if you have a *Done / Obsolete* list or something like this to contain cards that have been dealt with.
     - You can archive the card, which will hide it on your board, but not delete it. In this case, you have the option to reopen the card when the status change is reversed; that is, if an unpublished page is published, a hidden page is unhidden or a trashed page is restored.
-        - Note that the latter option is not available for page deletion events, because deleted pages can't be restored.
+        - Note that the restore option is not available for page deletion events, because deleted pages can't be restored.
     - You can also delete the card entirely. This is irreversible!
 - Finally, if you want to turn off all automatic actions this module performs, there's an off-switch right at the start of the module settings.
 
@@ -53,10 +54,10 @@ The module provides extensive options to control when and where cards are create
 This is a brief overview of how the module is structured and how it maps pages to cards. This is important to understand if you want to use modify the module's behaviour through hooks, or use it's API effectively. There are three main classes included:
 
 - `ProcessWire\TrelloWire`. This registers all hooks and handles page creation and change events according to the module configuration.
-- `ProcessWire\TrelloWireCard`. This is a ProcessWire module as well and is installed alongside the TrelloWire. It is a basic WireData container for card data and has several setter methods for the card title, description, labels, id etc. Every setter method is hookable, so you can hook into the card data independent of in what context it is created.
+- `ProcessWire\TrelloWireCard`. This is a ProcessWire module as well and is installed alongside the TrelloWire. It is a basic WireData container for card data and has several setter methods for the card title, description, labels, id etc. Every setter method is hookable, so you can hook into the card data independent of what context it is created in.
 - `ProcessWire\TrelloWire\TrelloWireApi`. This is a simple wrapper around the Trello API. Check the last section on how to use it.
 
-Whenever an applicable page is published (or created, depending on the settings), TrelloWire creates a new card on Trello using data from that page. The Trello API returns the card ID. This ID is then stored inside the [page's meta data](https://processwire.com/blog/posts/pw-3.0.133/#new-page-gt-meta-method). This way, ProcessWire pages are mapped to Trello cards. For subsequent page save events, TrelloWire will check if the page meta data contains a card ID and update the corresponding card according to the settings. Likewise, if you want to check whether a TrelloWireCard instance is intended for a new card or an existing card, check if it's `id` property is set. If it does, it references an existing card.
+Whenever an applicable page is published (or created, depending on the settings), TrelloWire creates a new card on Trello using data from that page. The Trello API returns the card ID. This ID is then stored inside the [page's meta data](https://processwire.com/blog/posts/pw-3.0.133/#new-page-gt-meta-method). This way, ProcessWire pages are mapped to Trello cards. For subsequent page save events, TrelloWire will check if the page meta data contains a card ID and update the corresponding card according to the settings. Likewise, if you want to check (e.g. in a hook) whether a TrelloWireCard instance corresponds to a new card or an existing card, check if it's `id` property is set. If it is, it references an existing card.
 
 ## Using the API class
 
@@ -69,7 +70,10 @@ $api = wire('modules')->get('TrelloWire')->api();
 That said, if you absolutely want to instantiate the class with different credentials, you can do so manually:
 
 ```php
-$api = new \ProcessWire\TrelloWire\TrelloWireApi($myApiKey, $myApiToken);
+$api = new \ProcessWire\TrelloWire\TrelloWireApi(
+    $myApiKey,
+    $myApiToken
+);
 ```
 
 All API requests will automatically include the API key & token, so you don't need to include them in the parameters. You can check if the API credentials used by the instance are valid through `$TrelloWireApi->isValidToken()`.
@@ -160,7 +164,7 @@ Update an existing Trello card's title and body with values from the TrelloWireC
 
 ### ProcessWire\TrelloWireCard
 
-The TrelloWireCard component is just a container for page data. All properties are set through hookable methods to their data can be modified whenever it is set. Note that the card has a `page` property which holds the page this card belongs to, so you can always access it's values. TrelloWire will always set the page property first, so if you are hooking any of the other methods you can rely on the page property being initialized at that point.
+The TrelloWireCard component is just a container for page data. All properties are set through hookable methods so their data can be modified whenever it is set. Note that the card has a `page` property which holds the page this card belongs to, so you can always access it's values. TrelloWire will always set the page property first, so if you are hooking any of the other methods you can rely on the page property being initialized at that point.
 
 You can create an empty instance through ProcessWire's API, or create a populated instance with data based on a ProcessWire page using the helper method on `TrelloWire`:
 
