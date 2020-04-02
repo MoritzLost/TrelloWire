@@ -147,7 +147,7 @@ class TrelloWire extends Wire implements Module
                     $this->api()->archiveCard($card->id);
                     break;
                 case self::STATUS_CHANGE_DELETE:
-                    $this->api()->deleteCard($card->id);
+                    $this->deleteCardForPage($card, $page);
                     break;
                 case self::STATUS_CHANGE_MOVE:
                     $targetSettingKey = "MoveListTarget{$change}";
@@ -187,16 +187,23 @@ class TrelloWire extends Wire implements Module
         if (!in_array($page->template->name, $this->TrelloWireTemplates)) return;
         $card = $this->buildCardData($page);
         if (!$card->id) return;
+
         switch ($this->StatusChangeDeleted) {
             case self::STATUS_CHANGE_ARCHIVE:
                 $this->api()->archiveCard($card->id);
+                break;
+            case self::STATUS_CHANGE_DELETE:
+                $this->deleteCardForPage($card, $page);
+                break;
             case self::STATUS_CHANGE_MOVE:
-                $this->api()->deleteCard($card->id);
-            case self::STATUS_CHANGE_MOVE:
-                $targetListId = $this->MoveListTarget;
+                $targetListId = $this->MoveListTargetDeleted;
                 if ($targetListId) {
                     $this->api()->moveCard($card->id, $targetListId);
                 }
+                break;
+            case self::STATUS_CHANGE_NO_ACTION:
+            default:
+                // no action
         }
     }
 
@@ -272,6 +279,28 @@ class TrelloWire extends Wire implements Module
                     $this->api()->addItemToChecklist($checklist->id, $item);
                 }
             }
+        }
+    }
+
+    /**
+     * Delete a card associated wih a page from Trello. Because the card no longer
+     * exists after this, the reference stored inside $page->meta() is removed as
+     * well.
+     *
+     * @param TrelloWireCard $card  The card instance holding the ID for the card to delete.
+     * @param Page $page            The page the card belongs to.
+     * @return void
+     */
+    public function ___deleteCardForPage(TrelloWireCard $card, Page $page)
+    {
+        if (!$card->id) return;
+        if (!$api = $this->api()) return;
+        $deleteSuccess = $api->deleteCard($card->id);
+        if ($deleteSuccess) {
+            $page->meta()->remove(self::CARD_REFERENCE_KEY);
+            $page->message($this->_('Successfully deleted the card associated with this page, and removed the reference to it.'));
+        } else {
+            $page->message($this->_('The card associated with this page could not be deleted. It may have been deleted manually.'));
         }
     }
 

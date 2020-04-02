@@ -128,6 +128,15 @@ Creates a card on Trello based on the data contained in the passed TrelloWireCar
 
 ---
 
+- `TrelloWire::deleteCardForPage`
+    - `@param TrelloWireCard $card`  The card instance holding the ID for the card to delete.
+    - `@param Page $page`            The page the card belongs to.
+    - `@return void`
+
+Delete a card associated wih a page from Trello. Because the card no longer exists after this, the reference stored inside $page->meta() is removed as well.
+
+---
+
 - `TrelloWire::getDefaultChecklistTitle`
     - **Hookable**
     - `@param Page $page`   The page the card being currently created is based on.
