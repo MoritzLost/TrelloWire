@@ -9,7 +9,7 @@ class TrelloWireCard extends WireData implements Module
             'title' => __('Trello Wire Card'),
             'summary' => __('TrelloWire: Card component (installed automatically).'),
             'author' => "Moritz L'Hoest",
-            'version' => '0.1.0',
+            'version' => '1.0.0',
             'icon' => 'trello',
             'requires' => [
                 'PHP>=7.2',
