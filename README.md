@@ -20,7 +20,7 @@ This module is supposed to enable custom workflows involving a bridge between Pr
 - If you create pages based on form submissions, you can create a Trello card for each new form submission, so someone on your team can claim the card and handle the request. This way, you can keep track of which requests your team has already responded to and how many pending requests there are. If you trash or delete the form submission pages in ProcessWire after you have dealt with them, you can have the module automatically archive or move the corresponding cards, so you don't have to manage the requests in two places. If you are using [Form Builder](https://processwire.com/store/form-builder), it has [an option to push new requests to pages](https://processwire.com/store/form-builder/#form-submission-features), so you can recreate this workflow very easily.
 - If your site has some kind of product database, you can map individual product pages to Trello cards. This way, you can manage and assign product pages to the editors on your team, making it easier to coordinate simultaneous work on your site.
 
-To get started, install the module. Right now you have to download it manually, but the module is pending approval in the ProcessWire modules directory and will soon be installable using the class name `TrelloWire`. Note the system requirements:
+To get started, install the module. In the backend, go to _Modules -> Install -> Add new_ and enter the class name `TrelloWire` under _Add Module from Directory_. Alternatively, you can install the module manually by downloading the repository and placing it in your `/site/modules/` directory. Note the system requirements:
 
 - PHP >= 7.2
 - ProcessWire >= 3.0.133
