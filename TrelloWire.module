@@ -229,9 +229,8 @@ class TrelloWire extends Wire implements Module
        $TrelloWireCard->setList($this->TargetList);
        $titleField = !empty($this->CardTitle) ? $this->CardTitle : $defaultSettings['CardTitle'];
        $TrelloWireCard->setTitle(wirePopulateStringTags($titleField, $page, ['entityDecode' => true]));
-       if (!empty($this->CardBody)) {
-           $TrelloWireCard->setBody(wirePopulateStringTags($this->CardBody, $page, ['entityDecode' => true]));
-       }
+       $cardBody = !empty($this->CardBody) ? wirePopulateStringTags($this->CardBody, $page, ['entityDecode' => true]) : '';
+       $TrelloWireCard->setBody($cardBody);
        // for existing cards (card id stored in page settings), restore the id
        $existingCardId = $page->meta(self::CARD_REFERENCE_KEY);
        if ($existingCardId) {

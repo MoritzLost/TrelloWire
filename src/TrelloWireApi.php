@@ -226,19 +226,19 @@ class TrelloWireApi extends Wire
     /**
      * Post a new card to the specified list. Returns true on success, false on failure.
      *
-     * @param string $idList    The ID of the list to add the card to.
-     * @param string $title     The name / title of the card.
-     * @param string $body      The description / body of the card.
-     * @param array $addData    Additional fields to pass to the API (associative array).
-     * @return object|boolean   Returns the card object on success or false on failure.
+     * @param string $idList        The ID of the list to add the card to.
+     * @param string|null $title    The name / title of the card.
+     * @param string|null $body     The description / body of the card.
+     * @param array $addData        Additional fields to pass to the API (associative array).
+     * @return object|boolean       Returns the card object on success or false on failure.
      */
-    public function createCard(string $idList, string $title, string $body = '', array $addData = [])
+    public function createCard(string $idList, ?string $title, ?string $body = '', array $addData = [])
     {
         $result = $this->post('cards', array_merge(
             $addData,
             [
-                'name' => $title,
-                'desc' => $body,
+                'name' => $title ?? '',
+                'desc' => $body ?? '',
                 'idList' => $idList
             ]
         ));
