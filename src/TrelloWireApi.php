@@ -12,6 +12,9 @@ class TrelloWireApi extends Wire
     /** @var WireHttp Always contains the WireHttp instance used for the last request made through this instance. */
     public $lastRequest;
 
+    /** @var mixed Always contains the response returned from the last request made through this instance. */
+    public $lastResponse;
+
     /** @var int Always contains the HTTP response code of the last request made through this instance. */
     public $lastResponseCode;
 
@@ -69,6 +72,7 @@ class TrelloWireApi extends Wire
             default:
                 $result = $WireHttp->send($url, $data, $method);
         }
+        $this->lastResponse = $result;
         $this->lastResponseCode = $WireHttp->getHttpCode();
         $this->lastResponseOk = $this->isResponseCodeOk($this->lastResponseCode);
         return $result;

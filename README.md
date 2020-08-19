@@ -85,6 +85,7 @@ The class uses [WireHttp](https://processwire.com/api/ref/wire-http/) to make re
 After making a request through one of the module methods, you can check the result in detail through the following public properties, which will always relate to the last request made:
 
 - `$TrelloWireApi->lastRequest` contains the WireHttp instance used for the last request (a new one is created for every request).
+- `$TrelloWireApi->lastResponse` contains the raw response to the last request.
 - `$TrelloWireApi->lastResponseCode` contains the HTTP response code of the last request as an integer.
 - `$TrelloWireApi->lastResponseOk` will be `true` if the last request was successful (HTTP response code in the 2XX range) and `false` if it wasn't.
 

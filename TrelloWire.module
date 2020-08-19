@@ -37,7 +37,7 @@ class TrelloWire extends Wire implements Module
             'summary' => __('A module providing a bridge to trello to create cards based on pages.'),
             'author' => "Moritz L'Hoest",
             'href' => 'https://github.com/MoritzLost/TrelloWire',
-            'version' => '1.0.1',
+            'version' => '1.1.0',
             'icon' => 'trello',
             'autoload' => true,
             'requires' => [
