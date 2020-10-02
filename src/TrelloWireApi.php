@@ -4,6 +4,8 @@ namespace ProcessWire\TrelloWire;
 use ProcessWire\Wire;
 use ProcessWire\WireHttp;
 
+use function ProcessWire\wire;
+
 class TrelloWireApi extends Wire
 {
     /** @var string The base URL for the Trello API. */
@@ -27,6 +29,9 @@ class TrelloWireApi extends Wire
     /** @var string The API token for Trello. */
     protected $ApiToken;
 
+    /** @var array Options to pass to WireHttp::send which determine the network interface to use for API requests. */
+    public $TrelloWireHttpOptions = [];
+
     /**
      * Construct a new API instance with an API key & token.
      *
@@ -37,6 +42,13 @@ class TrelloWireApi extends Wire
     {
         $this->ApiKey = $ApiKey;
         $this->ApiToken = $ApiToken;
+        $config = wire('config');
+        // the curl implementation in WireHttp doesnt work correctly below 3.0.167,
+        // so we default to fopen instead for older versions. can be overridden using config
+        $useCurl = function_exists('curl_init') && !ini_get('safe_mode') && $config->version('3.0.167');
+        $this->TrelloWireHttpOptions = $config->has('TrelloWireHttpOptions')
+            ? $config->get('TrelloWireHttpOptions')
+            : [ 'use' => $useCurl ? 'curl' : 'fopen', 'fallback' => false, ];
     }
 
     /**
@@ -60,17 +72,18 @@ class TrelloWireApi extends Wire
             ['key' => $this->ApiKey, 'token' => $this->ApiToken],
             $data
         );
+        $options = $this->TrelloWireHttpOptions;
         switch ($method) {
-            case 'GET':
-                $result = $WireHttp->get($url, $data);
-                break;
             case 'POST';
-                $result = $WireHttp->post($url, $data);
-                break;
             case 'PUT':
             case 'DELETE':
+                $data = defined('JSON_THROW_ON_ERROR') ? json_encode($data, constant('JSON_THROW_ON_ERROR')) : json_encode($data);
+                $WireHttp->setHeader('content-type', 'application/json');
+                $result = $WireHttp->send($url, $data, $method, $options);
+                break;
+            case 'GET':
             default:
-                $result = $WireHttp->send($url, $data, $method);
+                $result = $WireHttp->send($url, $data, $method, $options);
         }
         $this->lastResponse = $result;
         $this->lastResponseCode = $WireHttp->getHttpCode();

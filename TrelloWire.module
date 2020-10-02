@@ -34,14 +34,14 @@ class TrelloWire extends Wire implements Module
     {
         return [
             'title' => __('Trello Wire'),
-            'summary' => __('A module providing a bridge to trello to create cards based on pages.'),
+            'summary' => __('A ProcessWire + Trello workflow module allowing you to create Trello cards based on pages.'),
             'author' => "Moritz L'Hoest",
             'href' => 'https://github.com/MoritzLost/TrelloWire',
-            'version' => '1.1.0',
+            'version' => '2.0.0',
             'icon' => 'trello',
             'autoload' => true,
             'requires' => [
-                'ProcessWire>=3.0.133',
+                'ProcessWire>=3.0.167',
                 'PHP>=7.2',
             ],
             'installs' => [

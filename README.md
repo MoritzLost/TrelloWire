@@ -2,10 +2,13 @@
 
 This is a module for the [ProcessWire CMF](https://processwire.com/) that allows you to automatically create [Trello cards](https://trello.com/) for ProcessWire pages and update them when the pages are updated. This allows you to setup connected workflows. Card properties and change handling behaviour can be customized through the extensive module configuration. Every action the module performs is hookable, so you can modify when and how cards are created as much as you need to. The module also contains an API-component that makes it easy to make requests to the Trello API and build your own connected ProcessWire-Trello workflows.
 
+**Warning:** Version 2.0.0 of this module requires ProcessWire 3.0.167 or above, which at the time of writing is above the current stable ProcessWire release.
+
 ## Table of contents
 
 - [Motivation and how to get started](#motivation-and-how-to-get-started)
 - [Advanced configuration and workflow adjustments](#advanced-configuration-and-workflow-adjustments)
+    - [ProcessWire version support and switching the network implementation](#processwire-version-support-and-switching-the-network-implementation)
 - [How the module works](#how-the-module-works)
 - [Using the API class](#using-the-api-class)
 - [API & hook documentation](#api--hook-documentation)
@@ -48,6 +51,24 @@ The module provides extensive options to control when and where cards are create
         - Note that the restore option is not available for page deletion events, because deleted pages can't be restored.
     - You can also delete the card entirely. This is irreversible!
 - Finally, if you want to turn off all automatic actions this module performs, there's an off-switch right at the start of the module settings.
+
+### ProcessWire version support and switching the network implementation
+
+The module requires 3.0.167 because this version contains [several fixes](https://github.com/processwire/processwire/pull/179) to ProcessWire's `WireHttp` class which prevented the module from performing API requests using cURL. That said, you can still try to use the module on older ProcessWire versions, but you'll have to use fopen or socket connections for the API requests, which don't work as consistently as cURL.
+
+By default, the module will use cURL if the server supports it and the ProcessWire version is 3.0.167 or above. Otherwise, it will fall back to fopen.
+
+To support different server environments, there's a new configuration available which allows you to control which network implementation the module will use:
+
+```php
+// site/config.php
+$config->TrelloWireHttpOptions = [
+    'use' => 'fopen',
+    'fallback' => 'socket',
+];
+```
+
+Those options are used as the `$options` parameter for [WireHttp::send()](https://processwire.com/api/ref/wire-http/send/) in all requests performed by the `TrelloWireApi` class.
 
 ## How the module works
 
